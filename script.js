@@ -151,10 +151,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (gameId) {
             const game = games.find(g => g.id === gameId);
             if (game) {
+                // Apply fullscreen mode class to body
+                document.body.classList.add('is-fullscreen');
+                
                 // Skip calculator and go straight to game
                 calculatorView.style.display = 'none';
                 gamesView.style.display = 'flex';
                 gamesView.classList.add('active');
+                
+                // Trigger play
                 window.playGame(game);
             }
         }
@@ -191,12 +196,32 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const closeGame = () => {
+        document.body.classList.remove('is-fullscreen');
         gamePlayer.classList.add('hidden');
         gamesGrid.classList.remove('hidden');
         gameIframe.src = '';
+        
+        // Clear URL params without reloading
+        const url = new URL(window.location);
+        url.searchParams.delete('game');
+        window.history.replaceState({}, '', url);
+    };
+
+    const toggleNativeFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
     };
 
     // --- Event Listeners ---
+    document.getElementById('btn-toggle-native-fs').addEventListener('click', toggleNativeFullscreen);
+    
     document.querySelectorAll('.btn.num').forEach(btn => {
         btn.addEventListener('click', () => handleNumber(btn.dataset.val));
     });

@@ -291,6 +291,27 @@ body {
 
 .back-btn:hover { background-color: rgba(255, 255, 255, 0.1); }
 
+.player-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.fs-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.fs-btn:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
 .external-link {
     color: var(--text-dim);
     text-decoration: none;
@@ -332,6 +353,59 @@ body {
 
 .stats { display: flex; gap: 32px; }
 .stats span { display: flex; align-items: center; gap: 8px; }
+
+/* Fullscreen Mode Overrides */
+body.is-fullscreen {
+    overflow: hidden;
+}
+
+body.is-fullscreen .games-header,
+body.is-fullscreen .games-footer,
+body.is-fullscreen #games-grid {
+    display: none !important;
+}
+
+body.is-fullscreen #games-view {
+    padding: 0;
+    margin: 0;
+    height: 100vh;
+    width: 100vw;
+}
+
+body.is-fullscreen .games-container {
+    max-width: none;
+    height: 100vh;
+    margin: 0;
+}
+
+body.is-fullscreen .game-player {
+    height: 100vh;
+    width: 100vw;
+}
+
+body.is-fullscreen .player-header {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 16px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+body.is-fullscreen .player-header:hover {
+    opacity: 1;
+}
+
+body.is-fullscreen .iframe-wrapper {
+    border-radius: 0;
+    border: none;
+    height: 100vh;
+}
 
 @media (max-width: 600px) {
     .games-header { flex-direction: column; gap: 24px; align-items: flex-start; }

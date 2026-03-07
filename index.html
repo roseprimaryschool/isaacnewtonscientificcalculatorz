@@ -118,6 +118,9 @@
                         <button id="btn-login-trigger" class="login-trigger-btn">
                             <i data-lucide="user"></i> Log In
                         </button>
+                        <button id="btn-leaderboard-global" class="leaderboard-trigger-btn">
+                            <i data-lucide="trophy"></i> LEADERBOARD
+                        </button>
                         <button id="btn-exit-portal" class="exit-btn">
                             <i data-lucide="arrow-left"></i> EXIT PORTAL
                         </button>
@@ -155,6 +158,19 @@
                         <span><i data-lucide="users"></i> 42 SERVERS ONLINE</span>
                     </div>
                 </footer>
+            </div>
+        </div>
+
+        <!-- Leaderboard Modal -->
+        <div id="leaderboard-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="leaderboard-title">Global Leaderboard</h2>
+                    <button id="btn-close-leaderboard" class="close-btn"><i data-lucide="x"></i></button>
+                </div>
+                <div id="leaderboard-list" class="leaderboard-list">
+                    <!-- Leaderboard items will be loaded here -->
+                </div>
             </div>
         </div>
     </div>

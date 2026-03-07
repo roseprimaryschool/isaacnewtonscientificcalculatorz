@@ -1,19 +1,10 @@
 (function() {
-    const firebaseConfig = {
-        "projectId": "gen-lang-client-0444183176",
-        "appId": "1:25079534751:web:71e050a0fc49a39d9cfeaa",
-        "apiKey": "AIzaSyCk3mWbdc1crz5AcVN0KOUOIzHWiZ18ikM",
-        "authDomain": "gen-lang-client-0444183176.firebaseapp.com",
-        "firestoreDatabaseId": "ai-studio-78be3f93-89ca-44ef-92ee-04869b020253",
-        "storageBucket": "gen-lang-client-0444183176.firebasestorage.app",
-        "messagingSenderId": "25079534751",
-        "measurementId": ""
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    console.log('Nova Portal Initializing...');
+    // --- Simple Local Storage Auth ---
+    const getUsers = () => JSON.parse(localStorage.getItem('nova_users') || '[]');
+    const saveUsers = (users) => localStorage.setItem('nova_users', JSON.stringify(users));
+    const getCurrentUser = () => JSON.parse(localStorage.getItem('nova_current_user') || 'null');
+    const setCurrentUser = (user) => localStorage.setItem('nova_current_user', JSON.stringify(user));
 
     // --- State ---
     let displayValue = '0';
@@ -65,15 +56,24 @@
         safeAddListener('btn-logout', 'click', handleLogout);
 
         document.querySelectorAll('.btn.num').forEach(btn => {
-            btn.addEventListener('click', () => handleNumber(btn.dataset.val));
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleNumber(btn.dataset.val);
+            });
         });
 
         document.querySelectorAll('.btn.op').forEach(btn => {
-            btn.addEventListener('click', () => handleOperator(btn.dataset.op));
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleOperator(btn.dataset.op);
+            });
         });
 
         document.querySelectorAll('.btn.sci').forEach(btn => {
-            btn.addEventListener('click', () => scientific(btn.dataset.func));
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                scientific(btn.dataset.func);
+            });
         });
 
         if (authForm) authForm.addEventListener('submit', handleAuth);
@@ -82,11 +82,19 @@
 
     // --- Safety Check & Initial Setup ---
     const init = () => {
+        console.log('Running init...');
         try {
             attachListeners();
+            console.log('Listeners attached');
             if (typeof lucide !== 'undefined') lucide.createIcons();
             updateDisplay();
             loadGames(true);
+            
+            // Check session
+            const user = getCurrentUser();
+            if (user) {
+                updateAuthUI(user);
+            }
         } catch (e) {
             console.error('Initialization error:', e);
         }
@@ -139,7 +147,7 @@
     };
 
     const updateHistory = () => {
-        if (history.length === 0) return;
+        if (history.length === 0 || !historyBar) return;
         historyBar.innerHTML = history.map(h => `<span class="history-item">${h}</span>`).join('');
     };
 
@@ -221,83 +229,77 @@
             authSubtitle.textContent = 'Log in to your Nova account';
             authSubmitBtn.querySelector('span').textContent = 'Log In';
             authToggleText.innerHTML = `Don't have an account? <a href="#" id="auth-toggle-btn">Sign Up</a>`;
-            usernameGroup.classList.add('hidden');
+            if (usernameGroup) usernameGroup.classList.add('hidden');
         } else {
             authTitle.textContent = 'Create Account';
             authSubtitle.textContent = 'Join the Nova Portal';
             authSubmitBtn.querySelector('span').textContent = 'Sign Up';
             authToggleText.innerHTML = `Already have an account? <a href="#" id="auth-toggle-btn">Log In</a>`;
-            usernameGroup.classList.remove('hidden');
+            if (usernameGroup) usernameGroup.classList.remove('hidden');
         }
         
-        // Re-attach listener because we replaced innerHTML
         const newToggleBtn = document.getElementById('auth-toggle-btn');
         if (newToggleBtn) newToggleBtn.addEventListener('click', toggleAuthMode);
-        authError.classList.add('hidden');
+        if (authError) authError.classList.add('hidden');
     };
 
     const handleAuth = async (e) => {
         e.preventDefault();
-        const email = document.getElementById('auth-email').value;
+        const username = document.getElementById('auth-username').value.trim();
         const password = document.getElementById('auth-password').value;
-        const username = document.getElementById('auth-username') ? document.getElementById('auth-username').value : '';
         
-        authError.classList.add('hidden');
+        if (authError) authError.classList.add('hidden');
         authSubmitBtn.disabled = true;
-        authSubmitBtn.style.opacity = '0.5';
 
         try {
+            const users = getUsers();
+            
             if (authMode === 'signup') {
-                if (!username || username.length < 3) throw new Error('Username must be at least 3 characters');
-                
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const user = userCredential.user;
-                
-                // Update profile
-                await user.updateProfile({ displayName: username });
-                
-                // Create Firestore doc
-                await db.collection('users').doc(user.uid).set({
-                    uid: user.uid,
-                    username: username,
-                    email: email,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    highScore: 0
-                });
+                if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+                    throw new Error('Username already taken');
+                }
+                const newUser = { username, password, createdAt: new Date().toISOString() };
+                users.push(newUser);
+                saveUsers(users);
+                setCurrentUser(newUser);
+                updateAuthUI(newUser);
             } else {
-                await auth.signInWithEmailAndPassword(email, password);
+                const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+                if (!user) {
+                    throw new Error('Invalid username or password');
+                }
+                setCurrentUser(user);
+                updateAuthUI(user);
             }
             
             switchView('games');
         } catch (error) {
             console.error('Auth Error:', error);
-            authError.textContent = error.message.replace('Firebase: ', '');
-            authError.classList.remove('hidden');
+            if (authError) {
+                authError.textContent = error.message;
+                authError.classList.remove('hidden');
+            }
         } finally {
             authSubmitBtn.disabled = false;
-            authSubmitBtn.style.opacity = '1';
         }
     };
 
-    // Listen for Auth State
-    auth.onAuthStateChanged(async (user) => {
+    const updateAuthUI = (user) => {
         if (user) {
-            loginTriggerBtn.classList.add('hidden');
-            userProfile.classList.remove('hidden');
-            displayUsername.textContent = user.displayName || 'User';
+            if (loginTriggerBtn) loginTriggerBtn.classList.add('hidden');
+            if (userProfile) userProfile.classList.remove('hidden');
+            if (displayUsername) displayUsername.textContent = user.username;
         } else {
-            loginTriggerBtn.classList.remove('hidden');
-            userProfile.classList.add('hidden');
-            displayUsername.textContent = 'Guest';
+            if (loginTriggerBtn) loginTriggerBtn.classList.remove('hidden');
+            if (userProfile) userProfile.classList.add('hidden');
+            if (displayUsername) displayUsername.textContent = 'Guest';
         }
-    });
+    };
 
-    const handleLogout = async () => {
-        try {
-            await auth.signOut();
-        } catch (error) {
-            console.error('Logout Error:', error);
-        }
+    const handleLogout = () => {
+        setCurrentUser(null);
+        updateAuthUI(null);
+        switchView('calculator');
     };
 
     // --- Games Logic ---
@@ -319,15 +321,18 @@
             const game = games.find(g => g.id === gameId);
             if (game) {
                 document.body.classList.add('is-fullscreen');
-                calculatorView.style.display = 'none';
-                gamesView.style.display = 'flex';
-                gamesView.classList.add('active');
+                if (calculatorView) calculatorView.style.display = 'none';
+                if (gamesView) {
+                    gamesView.style.display = 'flex';
+                    gamesView.classList.add('active');
+                }
                 window.playGame(game);
             }
         }
     };
 
     const renderGames = (games) => {
+        if (!gamesGrid) return;
         gamesGrid.innerHTML = games.map(game => `
             <div class="game-card" onclick="window.playGame(${JSON.stringify(game).replace(/"/g, '&quot;')})">
                 <div class="game-icon" style="background-color: ${game.color}">
@@ -345,22 +350,22 @@
     };
 
     window.playGame = (game) => {
-        gamesGrid.classList.add('hidden');
-        gamePlayer.classList.remove('hidden');
-        gameIframe.src = game.iframeUrl;
-        gameTitle.textContent = game.title;
+        if (gamesGrid) gamesGrid.classList.add('hidden');
+        if (gamePlayer) gamePlayer.classList.remove('hidden');
+        if (gameIframe) gameIframe.src = game.iframeUrl;
+        if (gameTitle) gameTitle.textContent = game.title;
         
         const baseUrl = window.location.origin + window.location.pathname;
-        externalLink.href = `${baseUrl}?game=${game.id}`;
+        if (externalLink) externalLink.href = `${baseUrl}?game=${game.id}`;
         
         if (typeof lucide !== 'undefined') lucide.createIcons();
     };
 
     const closeGame = () => {
         document.body.classList.remove('is-fullscreen');
-        gamePlayer.classList.add('hidden');
-        gamesGrid.classList.remove('hidden');
-        gameIframe.src = '';
+        if (gamePlayer) gamePlayer.classList.add('hidden');
+        if (gamesGrid) gamesGrid.classList.remove('hidden');
+        if (gameIframe) gameIframe.src = '';
         
         const url = new URL(window.location);
         url.searchParams.delete('game');
@@ -380,5 +385,9 @@
     };
 
     // Run initialization
-    init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();

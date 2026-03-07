@@ -82,7 +82,8 @@ body {
     font-size: 48px;
     font-weight: 300;
     letter-spacing: -2px;
-    overflow: hidden;
+    white-space: nowrap;
+    min-width: 10px;
 }
 
 .history-bar {
@@ -122,9 +123,9 @@ body {
 .btn {
     height: 54px;
     border: none;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.05);
     color: white;
-    font-size: 17px;
+    font-size: 18px;
     font-weight: 500;
     border-radius: 12px;
     cursor: pointer;
@@ -135,9 +136,10 @@ body {
     position: relative;
     z-index: 5;
     -webkit-tap-highlight-color: transparent;
+    user-select: none;
 }
 
-.btn:hover { background-color: rgba(255, 255, 255, 0.05); }
+.btn:hover { background-color: rgba(255, 255, 255, 0.1); }
 .btn:active { transform: scale(0.95); }
 
 .btn.sci { background-color: rgba(255, 255, 255, 0.03); font-size: 14px; }

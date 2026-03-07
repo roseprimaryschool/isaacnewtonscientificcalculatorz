@@ -1,5 +1,6 @@
 (function() {
-    console.log('Nova Portal Initializing...');
+    console.log('Nova Portal v3.0 Initializing...');
+
     // --- Simple Local Storage Auth ---
     const getUsers = () => JSON.parse(localStorage.getItem('nova_users') || '[]');
     const saveUsers = (users) => localStorage.setItem('nova_users', JSON.stringify(users));
@@ -12,99 +13,96 @@
     let history = [];
     let lastInputSequence = '';
     let currentView = 'calculator';
-    let authMode = 'signup'; // 'signup' or 'login'
+    let authMode = 'signup';
 
-    // --- DOM Elements ---
-    const authView = document.getElementById('auth-view');
-    const authForm = document.getElementById('auth-form');
-    const authTitle = document.getElementById('auth-title');
-    const authSubtitle = document.getElementById('auth-subtitle');
-    const authSubmitBtn = document.getElementById('auth-submit-btn');
-    const authToggleBtn = document.getElementById('auth-toggle-btn');
-    const authToggleText = document.getElementById('auth-toggle-text');
-    const authError = document.getElementById('auth-error');
-    const usernameGroup = document.getElementById('username-group');
-    const userProfile = document.getElementById('user-profile');
-    const loginTriggerBtn = document.getElementById('btn-login-trigger');
-    const displayUsername = document.getElementById('display-username');
-    
-    const mainDisplay = document.getElementById('calc-main-display');
-    const expressionDisplay = document.getElementById('calc-expression');
-    const historyBar = document.getElementById('calc-history');
-    const calculatorView = document.getElementById('calculator-view');
-    const gamesView = document.getElementById('games-view');
-    const gamesGrid = document.getElementById('games-grid');
-    const gamePlayer = document.getElementById('game-player');
-    const gameIframe = document.getElementById('game-iframe');
-    const gameTitle = document.getElementById('current-game-title');
-    const externalLink = document.getElementById('external-link');
+    // --- DOM References (will be populated in init) ---
+    let els = {};
+
+    const selectElements = () => {
+        const ids = [
+            'auth-view', 'auth-form', 'auth-title', 'auth-subtitle', 
+            'auth-submit-btn', 'auth-toggle-btn', 'auth-toggle-text', 
+            'auth-error', 'username-group', 'user-profile', 
+            'btn-login-trigger', 'display-username', 'calc-main-display', 
+            'calc-expression', 'calc-history', 'calculator-view', 
+            'games-view', 'games-grid', 'game-player', 'game-iframe', 
+            'current-game-title', 'external-link', 'btn-clear', 
+            'btn-equal', 'btn-backspace', 'btn-exit-portal', 
+            'btn-back-to-hub', 'btn-logout'
+        ];
+        ids.forEach(id => {
+            els[id] = document.getElementById(id);
+        });
+    };
 
     // --- Event Listeners ---
     const attachListeners = () => {
-        const safeAddListener = (id, event, fn) => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener(event, fn);
+        console.log('Attaching listeners...');
+        
+        const safeListen = (id, event, fn) => {
+            if (els[id]) {
+                els[id].addEventListener(event, fn);
+                // Also add touchstart for mobile responsiveness
+                if (event === 'click') {
+                    els[id].addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        fn(e);
+                    }, { passive: false });
+                }
+            } else {
+                console.warn(`Element #${id} not found for listener`);
+            }
         };
 
-        safeAddListener('btn-toggle-native-fs', 'click', toggleNativeFullscreen);
-        safeAddListener('btn-clear', 'click', clear);
-        safeAddListener('btn-equal', 'click', calculate);
-        safeAddListener('btn-backspace', 'click', backspace);
-        safeAddListener('btn-exit-portal', 'click', () => switchView('calculator'));
-        safeAddListener('btn-back-to-hub', 'click', closeGame);
-        safeAddListener('btn-login-trigger', 'click', () => switchView('auth'));
-        safeAddListener('btn-logout', 'click', handleLogout);
+        safeListen('btn-clear', 'click', (e) => { clear(); });
+        safeListen('btn-equal', 'click', (e) => { calculate(); });
+        safeListen('btn-backspace', 'click', (e) => { backspace(); });
+        safeListen('btn-exit-portal', 'click', (e) => { switchView('calculator'); });
+        safeListen('btn-back-to-hub', 'click', (e) => { closeGame(); });
+        safeListen('btn-login-trigger', 'click', (e) => { switchView('auth'); });
+        safeListen('btn-logout', 'click', (e) => { handleLogout(); });
 
+        // Number buttons
         document.querySelectorAll('.btn.num').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            const handler = (e) => {
                 e.preventDefault();
-                handleNumber(btn.dataset.val);
-            });
+                const val = btn.getAttribute('data-val');
+                handleNumber(val);
+            };
+            btn.addEventListener('click', handler);
+            btn.addEventListener('touchstart', handler, { passive: false });
         });
 
+        // Operator buttons
         document.querySelectorAll('.btn.op').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            const handler = (e) => {
                 e.preventDefault();
-                handleOperator(btn.dataset.op);
-            });
+                const op = btn.getAttribute('data-op');
+                handleOperator(op);
+            };
+            btn.addEventListener('click', handler);
+            btn.addEventListener('touchstart', handler, { passive: false });
         });
 
+        // Scientific buttons
         document.querySelectorAll('.btn.sci').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            const handler = (e) => {
                 e.preventDefault();
-                scientific(btn.dataset.func);
-            });
+                const func = btn.getAttribute('data-func');
+                scientific(func);
+            };
+            btn.addEventListener('click', handler);
+            btn.addEventListener('touchstart', handler, { passive: false });
         });
 
-        if (authForm) authForm.addEventListener('submit', handleAuth);
-        if (authToggleBtn) authToggleBtn.addEventListener('click', toggleAuthMode);
-    };
-
-    // --- Safety Check & Initial Setup ---
-    const init = () => {
-        console.log('Running init...');
-        try {
-            attachListeners();
-            console.log('Listeners attached');
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            updateDisplay();
-            loadGames(true);
-            
-            // Check session
-            const user = getCurrentUser();
-            if (user) {
-                updateAuthUI(user);
-            }
-        } catch (e) {
-            console.error('Initialization error:', e);
-        }
+        if (els['auth-form']) els['auth-form'].addEventListener('submit', handleAuth);
+        if (els['auth-toggle-btn']) els['auth-toggle-btn'].addEventListener('click', toggleAuthMode);
     };
 
     // --- Calculator Logic ---
     const updateDisplay = () => {
-        if (!mainDisplay || !expressionDisplay) return;
-        mainDisplay.textContent = displayValue;
-        expressionDisplay.textContent = expressionValue;
+        if (els['calc-main-display']) els['calc-main-display'].textContent = displayValue;
+        if (els['calc-expression']) els['calc-expression'].textContent = expressionValue;
     };
 
     const handleNumber = (num) => {
@@ -126,7 +124,7 @@
     const calculate = () => {
         try {
             if (typeof math === 'undefined') {
-                displayValue = 'Error: MathJS missing';
+                displayValue = 'Math Error';
                 updateDisplay();
                 return;
             }
@@ -147,13 +145,15 @@
     };
 
     const updateHistory = () => {
-        if (history.length === 0 || !historyBar) return;
-        historyBar.innerHTML = history.map(h => `<span class="history-item">${h}</span>`).join('');
+        if (history.length === 0 || !els['calc-history']) return;
+        els['calc-history'].innerHTML = history.map(h => `<span class="history-item">${h}</span>`).join('');
     };
 
     const clear = () => {
+        console.log('Clear clicked, sequence:', lastInputSequence);
         if (lastInputSequence === '6326') {
             switchView('games');
+            lastInputSequence = '';
             return;
         }
         displayValue = '0';
@@ -201,7 +201,8 @@
 
     // --- View Switching ---
     const switchView = (view) => {
-        const views = [calculatorView, gamesView, authView];
+        console.log('Switching to view:', view);
+        const views = [els['calculator-view'], els['games-view'], els['auth-view']];
         views.forEach(v => {
             if (v) {
                 v.classList.remove('active');
@@ -209,12 +210,12 @@
             }
         });
 
-        const target = view === 'calculator' ? calculatorView : 
-                       view === 'games' ? gamesView : authView;
+        const target = view === 'calculator' ? els['calculator-view'] : 
+                       view === 'games' ? els['games-view'] : els['auth-view'];
         
         if (target) {
             target.style.display = 'flex';
-            setTimeout(() => target.classList.add('active'), 50);
+            setTimeout(() => target.classList.add('active'), 10);
         }
         currentView = view;
     };
@@ -225,22 +226,22 @@
         authMode = authMode === 'signup' ? 'login' : 'signup';
         
         if (authMode === 'login') {
-            authTitle.textContent = 'Welcome Back';
-            authSubtitle.textContent = 'Log in to your Nova account';
-            authSubmitBtn.querySelector('span').textContent = 'Log In';
-            authToggleText.innerHTML = `Don't have an account? <a href="#" id="auth-toggle-btn">Sign Up</a>`;
-            if (usernameGroup) usernameGroup.classList.add('hidden');
+            els['auth-title'].textContent = 'Welcome Back';
+            els['auth-subtitle'].textContent = 'Log in to your Nova account';
+            els['auth-submit-btn'].querySelector('span').textContent = 'Log In';
+            els['auth-toggle-text'].innerHTML = `Don't have an account? <a href="#" id="auth-toggle-btn">Sign Up</a>`;
+            if (els['username-group']) els['username-group'].classList.add('hidden');
         } else {
-            authTitle.textContent = 'Create Account';
-            authSubtitle.textContent = 'Join the Nova Portal';
-            authSubmitBtn.querySelector('span').textContent = 'Sign Up';
-            authToggleText.innerHTML = `Already have an account? <a href="#" id="auth-toggle-btn">Log In</a>`;
-            if (usernameGroup) usernameGroup.classList.remove('hidden');
+            els['auth-title'].textContent = 'Create Account';
+            els['auth-subtitle'].textContent = 'Join the Nova Portal';
+            els['auth-submit-btn'].querySelector('span').textContent = 'Sign Up';
+            els['auth-toggle-text'].innerHTML = `Already have an account? <a href="#" id="auth-toggle-btn">Log In</a>`;
+            if (els['username-group']) els['username-group'].classList.remove('hidden');
         }
         
         const newToggleBtn = document.getElementById('auth-toggle-btn');
         if (newToggleBtn) newToggleBtn.addEventListener('click', toggleAuthMode);
-        if (authError) authError.classList.add('hidden');
+        if (els['auth-error']) els['auth-error'].classList.add('hidden');
     };
 
     const handleAuth = async (e) => {
@@ -248,8 +249,8 @@
         const username = document.getElementById('auth-username').value.trim();
         const password = document.getElementById('auth-password').value;
         
-        if (authError) authError.classList.add('hidden');
-        authSubmitBtn.disabled = true;
+        if (els['auth-error']) els['auth-error'].classList.add('hidden');
+        els['auth-submit-btn'].disabled = true;
 
         try {
             const users = getUsers();
@@ -275,24 +276,24 @@
             switchView('games');
         } catch (error) {
             console.error('Auth Error:', error);
-            if (authError) {
-                authError.textContent = error.message;
-                authError.classList.remove('hidden');
+            if (els['auth-error']) {
+                els['auth-error'].textContent = error.message;
+                els['auth-error'].classList.remove('hidden');
             }
         } finally {
-            authSubmitBtn.disabled = false;
+            els['auth-submit-btn'].disabled = false;
         }
     };
 
     const updateAuthUI = (user) => {
         if (user) {
-            if (loginTriggerBtn) loginTriggerBtn.classList.add('hidden');
-            if (userProfile) userProfile.classList.remove('hidden');
-            if (displayUsername) displayUsername.textContent = user.username;
+            if (els['btn-login-trigger']) els['btn-login-trigger'].classList.add('hidden');
+            if (els['user-profile']) els['user-profile'].classList.remove('hidden');
+            if (els['display-username']) els['display-username'].textContent = user.username;
         } else {
-            if (loginTriggerBtn) loginTriggerBtn.classList.remove('hidden');
-            if (userProfile) userProfile.classList.add('hidden');
-            if (displayUsername) displayUsername.textContent = 'Guest';
+            if (els['btn-login-trigger']) els['btn-login-trigger'].classList.remove('hidden');
+            if (els['user-profile']) els['user-profile'].classList.add('hidden');
+            if (els['display-username']) els['display-username'].textContent = 'Guest';
         }
     };
 
@@ -321,10 +322,10 @@
             const game = games.find(g => g.id === gameId);
             if (game) {
                 document.body.classList.add('is-fullscreen');
-                if (calculatorView) calculatorView.style.display = 'none';
-                if (gamesView) {
-                    gamesView.style.display = 'flex';
-                    gamesView.classList.add('active');
+                if (els['calculator-view']) els['calculator-view'].style.display = 'none';
+                if (els['games-view']) {
+                    els['games-view'].style.display = 'flex';
+                    els['games-view'].classList.add('active');
                 }
                 window.playGame(game);
             }
@@ -332,8 +333,8 @@
     };
 
     const renderGames = (games) => {
-        if (!gamesGrid) return;
-        gamesGrid.innerHTML = games.map(game => `
+        if (!els['games-grid']) return;
+        els['games-grid'].innerHTML = games.map(game => `
             <div class="game-card" onclick="window.playGame(${JSON.stringify(game).replace(/"/g, '&quot;')})">
                 <div class="game-icon" style="background-color: ${game.color}">
                     <i data-lucide="gamepad-2"></i>
@@ -350,41 +351,43 @@
     };
 
     window.playGame = (game) => {
-        if (gamesGrid) gamesGrid.classList.add('hidden');
-        if (gamePlayer) gamePlayer.classList.remove('hidden');
-        if (gameIframe) gameIframe.src = game.iframeUrl;
-        if (gameTitle) gameTitle.textContent = game.title;
+        if (els['games-grid']) els['games-grid'].classList.add('hidden');
+        if (els['game-player']) els['game-player'].classList.remove('hidden');
+        if (els['game-iframe']) els['game-iframe'].src = game.iframeUrl;
+        if (els['current-game-title']) els['current-game-title'].textContent = game.title;
         
         const baseUrl = window.location.origin + window.location.pathname;
-        if (externalLink) externalLink.href = `${baseUrl}?game=${game.id}`;
+        if (els['external-link']) els['external-link'].href = `${baseUrl}?game=${game.id}`;
         
         if (typeof lucide !== 'undefined') lucide.createIcons();
     };
 
     const closeGame = () => {
         document.body.classList.remove('is-fullscreen');
-        if (gamePlayer) gamePlayer.classList.add('hidden');
-        if (gamesGrid) gamesGrid.classList.remove('hidden');
-        if (gameIframe) gameIframe.src = '';
+        if (els['game-player']) els['game-player'].classList.add('hidden');
+        if (els['games-grid']) els['games-grid'].classList.remove('hidden');
+        if (els['game-iframe']) els['game-iframe'].src = '';
         
         const url = new URL(window.location);
         url.searchParams.delete('game');
         window.history.replaceState({}, '', url);
     };
 
-    const toggleNativeFullscreen = () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-            });
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
-        }
+    // --- Initialization ---
+    const init = () => {
+        console.log('Init starting...');
+        selectElements();
+        attachListeners();
+        updateDisplay();
+        loadGames(true);
+        
+        const user = getCurrentUser();
+        if (user) updateAuthUI(user);
+        
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        console.log('Init complete.');
     };
 
-    // Run initialization
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {

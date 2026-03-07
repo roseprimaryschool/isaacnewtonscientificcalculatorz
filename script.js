@@ -122,7 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 calculatorView.style.display = 'none';
                 gamesView.style.display = 'flex';
                 setTimeout(() => gamesView.classList.add('active'), 50);
-                loadGames();
             }, 400);
         } else {
             gamesView.classList.remove('active');
@@ -135,13 +134,29 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- Games Logic ---
-    const loadGames = async () => {
+    const loadGames = async (isInitial = false) => {
         try {
             const response = await fetch('./games.json');
             const games = await response.json();
             renderGames(games);
+            if (isInitial) checkUrlParams(games);
         } catch (e) {
             console.error('Failed to load games:', e);
+        }
+    };
+
+    const checkUrlParams = (games) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameId = urlParams.get('game');
+        if (gameId) {
+            const game = games.find(g => g.id === gameId);
+            if (game) {
+                // Skip calculator and go straight to game
+                calculatorView.style.display = 'none';
+                gamesView.style.display = 'flex';
+                gamesView.classList.add('active');
+                window.playGame(game);
+            }
         }
     };
 
@@ -167,7 +182,11 @@ document.addEventListener('DOMContentLoaded', () => {
         gamePlayer.classList.remove('hidden');
         gameIframe.src = game.iframeUrl;
         gameTitle.textContent = game.title;
-        externalLink.href = game.iframeUrl;
+        
+        // Update external link to point to this app with the game parameter
+        const baseUrl = window.location.origin + window.location.pathname;
+        externalLink.href = `${baseUrl}?game=${game.id}`;
+        
         lucide.createIcons();
     };
 
@@ -195,4 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-backspace').addEventListener('click', backspace);
     document.getElementById('btn-exit-portal').addEventListener('click', () => switchView('calculator'));
     document.getElementById('btn-back-to-hub').addEventListener('click', closeGame);
+
+    // Initial load check
+    loadGames(true);
 });

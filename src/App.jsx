@@ -4,7 +4,7 @@ import { GamesHub } from './components/GamesHub';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
-  const [view, setView] = useState<'calculator' | 'games'>('calculator');
+  const [view, setView] = useState('calculator');
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
@@ -34,7 +34,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Subtle background elements */}
       <div className="fixed inset-0 pointer-events-none z-[-1]">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/5 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full" />

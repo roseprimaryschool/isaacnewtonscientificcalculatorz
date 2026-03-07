@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Games Logic ---
     const loadGames = async (isInitial = false) => {
         try {
-            const response = await fetch('./games.json');
+            const response = await fetch(`./games.json?v=${Date.now()}`);
             const games = await response.json();
             renderGames(games);
             if (isInitial) checkUrlParams(games);

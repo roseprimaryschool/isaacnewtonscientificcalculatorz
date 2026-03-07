@@ -1,13 +1,104 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nova Calc & Games</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="./src/main.jsx"></script>
-  </body>
-</html>
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Calculator View -->
+        <div id="calculator-view" class="view active">
+            <div class="calc-container">
+                <div class="calc-display">
+                    <div id="calc-expression" class="expression"></div>
+                    <div id="calc-main-display" class="main-display">0</div>
+                </div>
+                <div id="calc-history" class="history-bar">
+                    <span class="history-placeholder">Scientific Precision v2.5</span>
+                </div>
+                <div class="calc-keypad">
+                    <button class="btn sci" data-func="sin">sin</button>
+                    <button class="btn sci" data-func="cos">cos</button>
+                    <button class="btn sci" data-func="tan">tan</button>
+                    <button class="btn sci" data-func="sqrt">√</button>
+                    
+                    <button class="btn sci" data-func="log">log</button>
+                    <button class="btn sci" data-func="ln">ln</button>
+                    <button class="btn sci" data-func="pow">xʸ</button>
+                    <button class="btn clear" id="btn-clear">AC</button>
+                    
+                    <button class="btn num" data-val="7">7</button>
+                    <button class="btn num" data-val="8">8</button>
+                    <button class="btn num" data-val="9">9</button>
+                    <button class="btn op" data-op="/">÷</button>
+                    
+                    <button class="btn num" data-val="4">4</button>
+                    <button class="btn num" data-val="5">5</button>
+                    <button class="btn num" data-val="6">6</button>
+                    <button class="btn op" data-op="*">×</button>
+                    
+                    <button class="btn num" data-val="1">1</button>
+                    <button class="btn num" data-val="2">2</button>
+                    <button class="btn num" data-val="3">3</button>
+                    <button class="btn op" data-op="-">−</button>
+                    
+                    <button class="btn num" data-val="0">0</button>
+                    <button class="btn num" data-val=".">.</button>
+                    <button class="btn" id="btn-backspace"><i data-lucide="delete"></i></button>
+                    <button class="btn op" data-op="+">+</button>
+                    
+                    <button class="btn equal" id="btn-equal">=</button>
+                </div>
+            </div>
+        </div>
 
+        <!-- Games View -->
+        <div id="games-view" class="view">
+            <div class="games-container">
+                <header class="games-header">
+                    <div class="logo">
+                        <div class="icon-box"><i data-lucide="gamepad-2"></i></div>
+                        <h1>GAMES HUB</h1>
+                    </div>
+                    <button id="btn-exit-portal" class="exit-btn">
+                        <i data-lucide="arrow-left"></i> EXIT PORTAL
+                    </button>
+                </header>
+
+                <div id="games-grid" class="games-grid">
+                    <!-- Games will be loaded here -->
+                </div>
+
+                <div id="game-player" class="game-player hidden">
+                    <div class="player-header">
+                        <div class="player-info">
+                            <button id="btn-back-to-hub" class="back-btn"><i data-lucide="arrow-left"></i></button>
+                            <h2 id="current-game-title">Game Title</h2>
+                        </div>
+                        <a id="external-link" href="#" target="_blank" class="external-link">
+                            Open in new tab <i data-lucide="external-link"></i>
+                        </a>
+                    </div>
+                    <div class="iframe-wrapper">
+                        <iframe id="game-iframe" src="" frameborder="0" allowfullscreen></iframe>
+                    </div>
+                </div>
+
+                <footer class="games-footer">
+                    <div>© 2026 NOVA GAMING NETWORK</div>
+                    <div class="stats">
+                        <span><i data-lucide="trophy"></i> 1.2M ACTIVE PLAYERS</span>
+                        <span><i data-lucide="users"></i> 42 SERVERS ONLINE</span>
+                    </div>
+                </footer>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/mathjs@11.8.0/lib/browser/math.js"></script>
+    <script src="./script.js"></script>
+</body>
+</html>

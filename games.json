@@ -4,7 +4,7 @@
     "title": "2048",
     "description": "Join the numbers and get to the 2048 tile!",
     "iframeUrl": "https://play2048.co/",
-    "color": "bg-orange-500",
+    "color": "#f97316",
     "category": "Puzzle"
   },
   {
@@ -12,7 +12,7 @@
     "title": "Hextris",
     "description": "Fast-paced puzzle game inspired by Tetris.",
     "iframeUrl": "https://hextris.io/",
-    "color": "bg-pink-500",
+    "color": "#ec4899",
     "category": "Arcade"
   },
   {
@@ -20,7 +20,7 @@
     "title": "Pacman",
     "description": "Classic arcade action. Eat the dots, avoid the ghosts.",
     "iframeUrl": "https://macek.github.io/google_pacman/",
-    "color": "bg-yellow-400",
+    "color": "#facc15",
     "category": "Classic"
   }
 ]

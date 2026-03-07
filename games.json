@@ -38,5 +38,13 @@
     "iframeUrl": "./tank-game.html",
     "color": "#3b82f6",
     "category": "Action"
+  },
+  {
+    "id": "escaperoad",
+    "title": "Escape Road",
+    "description": "High-speed police chase survival game. Drive fast, escape the law!",
+    "iframeUrl": "./escape-road.html",
+    "color": "#ef4444",
+    "category": "Action"
   }
 ]

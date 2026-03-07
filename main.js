@@ -1,41 +1,22 @@
-import { initializeApp } from 'firebase/app';
-import { 
-    getAuth,
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    onAuthStateChanged, 
-    signOut,
-    updateProfile
-} from 'firebase/auth';
-import { 
-    getFirestore,
-    doc, 
-    setDoc, 
-    getDoc, 
-    serverTimestamp 
-} from 'firebase/firestore';
+(function() {
+    const firebaseConfig = {
+        "projectId": "gen-lang-client-0444183176",
+        "appId": "1:25079534751:web:71e050a0fc49a39d9cfeaa",
+        "apiKey": "AIzaSyCk3mWbdc1crz5AcVN0KOUOIzHWiZ18ikM",
+        "authDomain": "gen-lang-client-0444183176.firebaseapp.com",
+        "firestoreDatabaseId": "ai-studio-78be3f93-89ca-44ef-92ee-04869b020253",
+        "storageBucket": "gen-lang-client-0444183176.firebasestorage.app",
+        "messagingSenderId": "25079534751",
+        "measurementId": ""
+    };
 
-const firebaseConfig = {
-  "projectId": "gen-lang-client-0444183176",
-  "appId": "1:25079534751:web:71e050a0fc49a39d9cfeaa",
-  "apiKey": "AIzaSyCk3mWbdc1crz5AcVN0KOUOIzHWiZ18ikM",
-  "authDomain": "gen-lang-client-0444183176.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-78be3f93-89ca-44ef-92ee-04869b020253",
-  "storageBucket": "gen-lang-client-0444183176.firebasestorage.app",
-  "messagingSenderId": "25079534751",
-  "measurementId": ""
-};
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-const auth = getAuth(app);
-
-// Initialize Lucide icons
-lucide.createIcons();
-
-// --- State ---
-let displayValue = '0';
+    // --- State ---
+    let displayValue = '0';
     let expressionValue = '';
     let history = [];
     let lastInputSequence = '';
@@ -67,8 +48,53 @@ let displayValue = '0';
     const gameTitle = document.getElementById('current-game-title');
     const externalLink = document.getElementById('external-link');
 
+    // --- Event Listeners ---
+    const attachListeners = () => {
+        const safeAddListener = (id, event, fn) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener(event, fn);
+        };
+
+        safeAddListener('btn-toggle-native-fs', 'click', toggleNativeFullscreen);
+        safeAddListener('btn-clear', 'click', clear);
+        safeAddListener('btn-equal', 'click', calculate);
+        safeAddListener('btn-backspace', 'click', backspace);
+        safeAddListener('btn-exit-portal', 'click', () => switchView('calculator'));
+        safeAddListener('btn-back-to-hub', 'click', closeGame);
+        safeAddListener('btn-login-trigger', 'click', () => switchView('auth'));
+        safeAddListener('btn-logout', 'click', handleLogout);
+
+        document.querySelectorAll('.btn.num').forEach(btn => {
+            btn.addEventListener('click', () => handleNumber(btn.dataset.val));
+        });
+
+        document.querySelectorAll('.btn.op').forEach(btn => {
+            btn.addEventListener('click', () => handleOperator(btn.dataset.op));
+        });
+
+        document.querySelectorAll('.btn.sci').forEach(btn => {
+            btn.addEventListener('click', () => scientific(btn.dataset.func));
+        });
+
+        if (authForm) authForm.addEventListener('submit', handleAuth);
+        if (authToggleBtn) authToggleBtn.addEventListener('click', toggleAuthMode);
+    };
+
+    // --- Safety Check & Initial Setup ---
+    const init = () => {
+        try {
+            attachListeners();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            updateDisplay();
+            loadGames(true);
+        } catch (e) {
+            console.error('Initialization error:', e);
+        }
+    };
+
     // --- Calculator Logic ---
     const updateDisplay = () => {
+        if (!mainDisplay || !expressionDisplay) return;
         mainDisplay.textContent = displayValue;
         expressionDisplay.textContent = expressionValue;
     };
@@ -91,6 +117,11 @@ let displayValue = '0';
 
     const calculate = () => {
         try {
+            if (typeof math === 'undefined') {
+                displayValue = 'Error: MathJS missing';
+                updateDisplay();
+                return;
+            }
             const result = math.evaluate(expressionValue + displayValue);
             const formatted = Number.isInteger(result) ? result.toString() : result.toFixed(8).replace(/\.?0+$/, '');
             
@@ -134,6 +165,7 @@ let displayValue = '0';
 
     const scientific = (func) => {
         try {
+            if (typeof math === 'undefined') return;
             const val = parseFloat(displayValue);
             let result;
             switch (func) {
@@ -163,15 +195,19 @@ let displayValue = '0';
     const switchView = (view) => {
         const views = [calculatorView, gamesView, authView];
         views.forEach(v => {
-            v.classList.remove('active');
-            v.style.display = 'none';
+            if (v) {
+                v.classList.remove('active');
+                v.style.display = 'none';
+            }
         });
 
         const target = view === 'calculator' ? calculatorView : 
                        view === 'games' ? gamesView : authView;
         
-        target.style.display = 'flex';
-        setTimeout(() => target.classList.add('active'), 50);
+        if (target) {
+            target.style.display = 'flex';
+            setTimeout(() => target.classList.add('active'), 50);
+        }
         currentView = view;
     };
 
@@ -195,7 +231,8 @@ let displayValue = '0';
         }
         
         // Re-attach listener because we replaced innerHTML
-        document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
+        const newToggleBtn = document.getElementById('auth-toggle-btn');
+        if (newToggleBtn) newToggleBtn.addEventListener('click', toggleAuthMode);
         authError.classList.add('hidden');
     };
 
@@ -203,7 +240,7 @@ let displayValue = '0';
         e.preventDefault();
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
-        const username = document.getElementById('auth-username').value;
+        const username = document.getElementById('auth-username') ? document.getElementById('auth-username').value : '';
         
         authError.classList.add('hidden');
         authSubmitBtn.disabled = true;
@@ -213,22 +250,22 @@ let displayValue = '0';
             if (authMode === 'signup') {
                 if (!username || username.length < 3) throw new Error('Username must be at least 3 characters');
                 
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                 const user = userCredential.user;
                 
                 // Update profile
-                await updateProfile(user, { displayName: username });
+                await user.updateProfile({ displayName: username });
                 
                 // Create Firestore doc
-                await setDoc(doc(db, 'users', user.uid), {
+                await db.collection('users').doc(user.uid).set({
                     uid: user.uid,
                     username: username,
                     email: email,
-                    createdAt: serverTimestamp(),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     highScore: 0
                 });
             } else {
-                await signInWithEmailAndPassword(auth, email, password);
+                await auth.signInWithEmailAndPassword(email, password);
             }
             
             switchView('games');
@@ -243,7 +280,7 @@ let displayValue = '0';
     };
 
     // Listen for Auth State
-    onAuthStateChanged(auth, async (user) => {
+    auth.onAuthStateChanged(async (user) => {
         if (user) {
             loginTriggerBtn.classList.add('hidden');
             userProfile.classList.remove('hidden');
@@ -257,7 +294,7 @@ let displayValue = '0';
 
     const handleLogout = async () => {
         try {
-            await signOut(auth);
+            await auth.signOut();
         } catch (error) {
             console.error('Logout Error:', error);
         }
@@ -281,15 +318,10 @@ let displayValue = '0';
         if (gameId) {
             const game = games.find(g => g.id === gameId);
             if (game) {
-                // Apply fullscreen mode class to body
                 document.body.classList.add('is-fullscreen');
-                
-                // Skip calculator and go straight to game
                 calculatorView.style.display = 'none';
                 gamesView.style.display = 'flex';
                 gamesView.classList.add('active');
-                
-                // Trigger play
                 window.playGame(game);
             }
         }
@@ -309,7 +341,7 @@ let displayValue = '0';
                 </button>
             </div>
         `).join('');
-        lucide.createIcons();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     };
 
     window.playGame = (game) => {
@@ -318,11 +350,10 @@ let displayValue = '0';
         gameIframe.src = game.iframeUrl;
         gameTitle.textContent = game.title;
         
-        // Update external link to point to this app with the game parameter
         const baseUrl = window.location.origin + window.location.pathname;
         externalLink.href = `${baseUrl}?game=${game.id}`;
         
-        lucide.createIcons();
+        if (typeof lucide !== 'undefined') lucide.createIcons();
     };
 
     const closeGame = () => {
@@ -331,7 +362,6 @@ let displayValue = '0';
         gamesGrid.classList.remove('hidden');
         gameIframe.src = '';
         
-        // Clear URL params without reloading
         const url = new URL(window.location);
         url.searchParams.delete('game');
         window.history.replaceState({}, '', url);
@@ -349,31 +379,6 @@ let displayValue = '0';
         }
     };
 
-    // --- Event Listeners ---
-    document.getElementById('btn-toggle-native-fs').addEventListener('click', toggleNativeFullscreen);
-    
-    document.querySelectorAll('.btn.num').forEach(btn => {
-        btn.addEventListener('click', () => handleNumber(btn.dataset.val));
-    });
-
-    document.querySelectorAll('.btn.op').forEach(btn => {
-        btn.addEventListener('click', () => handleOperator(btn.dataset.op));
-    });
-
-    document.querySelectorAll('.btn.sci').forEach(btn => {
-        btn.addEventListener('click', () => scientific(btn.dataset.func));
-    });
-
-    document.getElementById('btn-clear').addEventListener('click', clear);
-    document.getElementById('btn-equal').addEventListener('click', calculate);
-    document.getElementById('btn-backspace').addEventListener('click', backspace);
-    document.getElementById('btn-exit-portal').addEventListener('click', () => switchView('calculator'));
-    document.getElementById('btn-back-to-hub').addEventListener('click', closeGame);
-    document.getElementById('btn-login-trigger').addEventListener('click', () => switchView('auth'));
-    document.getElementById('btn-logout').addEventListener('click', handleLogout);
-    authForm.addEventListener('submit', handleAuth);
-    authToggleBtn.addEventListener('click', toggleAuthMode);
-
-    // Initial load check
-    loadGames(true);
-
+    // Run initialization
+    init();
+})();

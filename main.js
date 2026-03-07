@@ -1,15 +1,61 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Lucide icons
-    lucide.createIcons();
+import { initializeApp } from 'firebase/app';
+import { 
+    getAuth,
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    onAuthStateChanged, 
+    signOut,
+    updateProfile
+} from 'firebase/auth';
+import { 
+    getFirestore,
+    doc, 
+    setDoc, 
+    getDoc, 
+    serverTimestamp 
+} from 'firebase/firestore';
 
-    // --- State ---
-    let displayValue = '0';
+const firebaseConfig = {
+  "projectId": "gen-lang-client-0444183176",
+  "appId": "1:25079534751:web:71e050a0fc49a39d9cfeaa",
+  "apiKey": "AIzaSyCk3mWbdc1crz5AcVN0KOUOIzHWiZ18ikM",
+  "authDomain": "gen-lang-client-0444183176.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-78be3f93-89ca-44ef-92ee-04869b020253",
+  "storageBucket": "gen-lang-client-0444183176.firebasestorage.app",
+  "messagingSenderId": "25079534751",
+  "measurementId": ""
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const auth = getAuth(app);
+
+// Initialize Lucide icons
+lucide.createIcons();
+
+// --- State ---
+let displayValue = '0';
     let expressionValue = '';
     let history = [];
     let lastInputSequence = '';
     let currentView = 'calculator';
+    let authMode = 'signup'; // 'signup' or 'login'
 
     // --- DOM Elements ---
+    const authView = document.getElementById('auth-view');
+    const authForm = document.getElementById('auth-form');
+    const authTitle = document.getElementById('auth-title');
+    const authSubtitle = document.getElementById('auth-subtitle');
+    const authSubmitBtn = document.getElementById('auth-submit-btn');
+    const authToggleBtn = document.getElementById('auth-toggle-btn');
+    const authToggleText = document.getElementById('auth-toggle-text');
+    const authError = document.getElementById('auth-error');
+    const usernameGroup = document.getElementById('username-group');
+    const userProfile = document.getElementById('user-profile');
+    const loginTriggerBtn = document.getElementById('btn-login-trigger');
+    const displayUsername = document.getElementById('display-username');
+    
     const mainDisplay = document.getElementById('calc-main-display');
     const expressionDisplay = document.getElementById('calc-expression');
     const historyBar = document.getElementById('calc-history');
@@ -115,21 +161,105 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- View Switching ---
     const switchView = (view) => {
+        const views = [calculatorView, gamesView, authView];
+        views.forEach(v => {
+            v.classList.remove('active');
+            v.style.display = 'none';
+        });
+
+        const target = view === 'calculator' ? calculatorView : 
+                       view === 'games' ? gamesView : authView;
+        
+        target.style.display = 'flex';
+        setTimeout(() => target.classList.add('active'), 50);
         currentView = view;
-        if (view === 'games') {
-            calculatorView.classList.remove('active');
-            setTimeout(() => {
-                calculatorView.style.display = 'none';
-                gamesView.style.display = 'flex';
-                setTimeout(() => gamesView.classList.add('active'), 50);
-            }, 400);
+    };
+
+    // --- Auth Logic ---
+    const toggleAuthMode = (e) => {
+        if (e) e.preventDefault();
+        authMode = authMode === 'signup' ? 'login' : 'signup';
+        
+        if (authMode === 'login') {
+            authTitle.textContent = 'Welcome Back';
+            authSubtitle.textContent = 'Log in to your Nova account';
+            authSubmitBtn.querySelector('span').textContent = 'Log In';
+            authToggleText.innerHTML = `Don't have an account? <a href="#" id="auth-toggle-btn">Sign Up</a>`;
+            usernameGroup.classList.add('hidden');
         } else {
-            gamesView.classList.remove('active');
-            setTimeout(() => {
-                gamesView.style.display = 'none';
-                calculatorView.style.display = 'flex';
-                setTimeout(() => calculatorView.classList.add('active'), 50);
-            }, 400);
+            authTitle.textContent = 'Create Account';
+            authSubtitle.textContent = 'Join the Nova Portal';
+            authSubmitBtn.querySelector('span').textContent = 'Sign Up';
+            authToggleText.innerHTML = `Already have an account? <a href="#" id="auth-toggle-btn">Log In</a>`;
+            usernameGroup.classList.remove('hidden');
+        }
+        
+        // Re-attach listener because we replaced innerHTML
+        document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
+        authError.classList.add('hidden');
+    };
+
+    const handleAuth = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+        const username = document.getElementById('auth-username').value;
+        
+        authError.classList.add('hidden');
+        authSubmitBtn.disabled = true;
+        authSubmitBtn.style.opacity = '0.5';
+
+        try {
+            if (authMode === 'signup') {
+                if (!username || username.length < 3) throw new Error('Username must be at least 3 characters');
+                
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                // Update profile
+                await updateProfile(user, { displayName: username });
+                
+                // Create Firestore doc
+                await setDoc(doc(db, 'users', user.uid), {
+                    uid: user.uid,
+                    username: username,
+                    email: email,
+                    createdAt: serverTimestamp(),
+                    highScore: 0
+                });
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+            
+            switchView('games');
+        } catch (error) {
+            console.error('Auth Error:', error);
+            authError.textContent = error.message.replace('Firebase: ', '');
+            authError.classList.remove('hidden');
+        } finally {
+            authSubmitBtn.disabled = false;
+            authSubmitBtn.style.opacity = '1';
+        }
+    };
+
+    // Listen for Auth State
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            loginTriggerBtn.classList.add('hidden');
+            userProfile.classList.remove('hidden');
+            displayUsername.textContent = user.displayName || 'User';
+        } else {
+            loginTriggerBtn.classList.remove('hidden');
+            userProfile.classList.add('hidden');
+            displayUsername.textContent = 'Guest';
+        }
+    });
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error('Logout Error:', error);
         }
     };
 
@@ -239,7 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-backspace').addEventListener('click', backspace);
     document.getElementById('btn-exit-portal').addEventListener('click', () => switchView('calculator'));
     document.getElementById('btn-back-to-hub').addEventListener('click', closeGame);
+    document.getElementById('btn-login-trigger').addEventListener('click', () => switchView('auth'));
+    document.getElementById('btn-logout').addEventListener('click', handleLogout);
+    authForm.addEventListener('submit', handleAuth);
+    authToggleBtn.addEventListener('click', toggleAuthMode);
 
     // Initial load check
     loadGames(true);
-});
+

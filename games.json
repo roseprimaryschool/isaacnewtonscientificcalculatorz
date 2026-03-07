@@ -32,11 +32,11 @@
     "category": "Action"
   },
   {
-    "id": "tanktrouble",
-    "title": "Tank Trouble",
-    "description": "Classic maze-based tank combat. Play against friends or AI.",
-    "iframeUrl": "https://tank-trouble.com/",
-    "color": "#4b5563",
+    "id": "novatanks",
+    "title": "Nova Tanks",
+    "description": "Locally hosted tank combat. 2-Player battle with bouncing bullets.",
+    "iframeUrl": "./tank-game.html",
+    "color": "#3b82f6",
     "category": "Action"
   }
 ]

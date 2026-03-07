@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nova Tanks</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        canvas { background: #000; border: 4px solid #333; box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair; }
+        .ui { position: absolute; top: 20px; display: flex; gap: 40px; font-size: 24px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); pointer-events: none; }
+        .controls { position: absolute; bottom: 20px; color: #666; font-size: 14px; text-align: center; pointer-events: none; }
+        .p1 { color: #3b82f6; }
+        .p2 { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <div class="p1">P1: <span id="s1">0</span></div>
+        <div class="p2">P2: <span id="s2">0</span></div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        P1: WASD to Move, SPACE to Shoot | P2: ARROWS to Move, ENTER to Shoot
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const s1Disp = document.getElementById('s1');
+        const s2Disp = document.getElementById('s2');
+
+        canvas.width = 800;
+        canvas.height = 600;
+
+        const TANK_SIZE = 30;
+        const BULLET_SPEED = 5;
+        const ROT_SPEED = 0.05;
+        const MOVE_SPEED = 3;
+        const MAX_BULLETS = 5;
+
+        let score1 = 0;
+        let score2 = 0;
+
+        class Bullet {
+            constructor(x, y, angle, owner) {
+                this.x = x;
+                this.y = y;
+                this.vx = Math.cos(angle) * BULLET_SPEED;
+                this.vy = Math.sin(angle) * BULLET_SPEED;
+                this.bounces = 0;
+                this.owner = owner;
+                this.radius = 4;
+                this.dead = false;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > canvas.width) {
+                    this.vx *= -1;
+                    this.bounces++;
+                }
+                if (this.y < 0 || this.y > canvas.height) {
+                    this.vy *= -1;
+                    this.bounces++;
+                }
+
+                if (this.bounces > 5) this.dead = true;
+            }
+            draw() {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class Tank {
+            constructor(x, y, color, controls) {
+                this.reset(x, y);
+                this.color = color;
+                this.controls = controls;
+                this.bullets = [];
+            }
+            reset(x, y) {
+                this.x = x;
+                this.y = y;
+                this.angle = 0;
+                this.dead = false;
+            }
+            update(keys) {
+                if (this.dead) return;
+
+                if (keys[this.controls.left]) this.angle -= ROT_SPEED;
+                if (keys[this.controls.right]) this.angle += ROT_SPEED;
+                
+                if (keys[this.controls.up]) {
+                    this.x += Math.cos(this.angle) * MOVE_SPEED;
+                    this.y += Math.sin(this.angle) * MOVE_SPEED;
+                }
+                if (keys[this.controls.down]) {
+                    this.x -= Math.cos(this.angle) * MOVE_SPEED;
+                    this.y -= Math.sin(this.angle) * MOVE_SPEED;
+                }
+
+                // Bounds
+                this.x = Math.max(TANK_SIZE/2, Math.min(canvas.width - TANK_SIZE/2, this.x));
+                this.y = Math.max(TANK_SIZE/2, Math.min(canvas.height - TANK_SIZE/2, this.y));
+
+                // Shooting
+                if (keys[this.controls.shoot] && !this.lastShoot && this.bullets.length < MAX_BULLETS) {
+                    this.bullets.push(new Bullet(
+                        this.x + Math.cos(this.angle) * 25,
+                        this.y + Math.sin(this.angle) * 25,
+                        this.angle,
+                        this
+                    ));
+                }
+                this.lastShoot = keys[this.controls.shoot];
+
+                this.bullets.forEach(b => b.update());
+                this.bullets = this.bullets.filter(b => !b.dead);
+            }
+            draw() {
+                if (this.dead) return;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                // Body
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-TANK_SIZE/2, -TANK_SIZE/2, TANK_SIZE, TANK_SIZE);
+                
+                // Turret
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(0, -5, 20, 10);
+                
+                ctx.restore();
+
+                this.bullets.forEach(b => b.draw());
+            }
+        }
+
+        const p1 = new Tank(100, 300, '#3b82f6', { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', shoot: 'Space' });
+        const p2 = new Tank(700, 300, '#ef4444', { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', shoot: 'Enter' });
+        p2.angle = Math.PI;
+
+        const keys = {};
+        window.onkeydown = (e) => keys[e.code] = true;
+        window.onkeyup = (e) => keys[e.code] = false;
+
+        function checkCollision() {
+            [p1, p2].forEach(tank => {
+                const other = tank === p1 ? p2 : p1;
+                
+                // Check bullets hitting tanks
+                [p1.bullets, p2.bullets].flat().forEach(b => {
+                    const dist = Math.hypot(b.x - tank.x, b.y - tank.y);
+                    if (dist < TANK_SIZE/2 + b.radius) {
+                        tank.dead = true;
+                        b.dead = true;
+                        if (tank === p1) score2++;
+                        else score1++;
+                        s1Disp.textContent = score1;
+                        s2Disp.textContent = score2;
+                        setTimeout(() => {
+                            p1.reset(100, 300);
+                            p2.reset(700, 300);
+                            p2.angle = Math.PI;
+                        }, 1000);
+                    }
+                });
+            });
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            p1.update(keys);
+            p2.update(keys);
+            
+            checkCollision();
+            
+            p1.draw();
+            p2.draw();
+            
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>

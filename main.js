@@ -126,8 +126,9 @@
         const calcView = document.getElementById('calculator-view');
         const gamesView = document.getElementById('games-view');
         const authView = document.getElementById('auth-view');
+        const videosView = document.getElementById('videos-view');
         
-        [calcView, gamesView, authView].forEach(v => {
+        [calcView, gamesView, authView, videosView].forEach(v => {
             if (v) {
                 v.style.display = 'none';
                 v.classList.remove('active');
@@ -138,7 +139,11 @@
         if (view === 'calculator') target = calcView;
         else if (view === 'games') {
             target = gamesView;
-            loadGames(); // Refresh games list when entering hub
+            loadGames();
+        }
+        else if (view === 'videos') {
+            target = videosView;
+            loadVideos();
         }
         else target = authView;
 
@@ -147,6 +152,38 @@
             target.classList.add('active');
         }
         currentView = view;
+    }
+
+    // --- Videos ---
+    function loadVideos() {
+        const grid = document.getElementById('videos-grid');
+        if (!grid) return;
+
+        const videos = [
+            { id: 1, title: "Cyberpunk Drift", thumbnail: "https://picsum.photos/seed/drift/800/450", duration: "2:45", views: "1.2M" },
+            { id: 2, title: "Neon Nights", thumbnail: "https://picsum.photos/seed/neon/800/450", duration: "5:12", views: "850K" },
+            { id: 3, title: "Retro Wave", thumbnail: "https://picsum.photos/seed/retro/800/450", duration: "3:30", views: "2.1M" },
+            { id: 4, title: "Digital Horizon", thumbnail: "https://picsum.photos/seed/horizon/800/450", duration: "4:20", views: "500K" }
+        ];
+
+        grid.innerHTML = videos.map(vid => `
+            <div class="video-card">
+                <div class="video-thumb">
+                    <img src="${vid.thumbnail}" alt="${vid.title}" referrerPolicy="no-referrer">
+                    <span class="video-duration">${vid.duration}</span>
+                    <div class="video-play-overlay"><i data-lucide="play"></i></div>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${vid.title}</h3>
+                    <div class="video-meta">
+                        <span>${vid.views} views</span>
+                        <span class="dot">•</span>
+                        <span>2 days ago</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        if (window.lucide) window.lucide.createIcons();
     }
 
     // --- Auth ---
@@ -360,6 +397,8 @@
         document.getElementById('btn-back-to-hub')?.addEventListener('click', closeGame);
         document.getElementById('btn-login-trigger')?.addEventListener('click', () => switchView('auth'));
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
+        document.getElementById('btn-nav-videos')?.addEventListener('click', () => switchView('videos'));
+        document.getElementById('btn-nav-games')?.addEventListener('click', () => switchView('games'));
         document.getElementById('btn-close-leaderboard')?.addEventListener('click', () => {
             document.getElementById('leaderboard-modal')?.classList.add('hidden');
         });
@@ -388,7 +427,8 @@
             e.preventDefault();
             authMode = authMode === 'signup' ? 'login' : 'signup';
             document.getElementById('auth-title').innerText = authMode === 'signup' ? 'Create Account' : 'Welcome Back';
-            document.getElementById('username-group').style.display = authMode === 'signup' ? 'block' : 'none';
+            // Username is now always required for both signup and login
+            document.getElementById('username-group').style.display = 'block'; 
             document.getElementById('auth-submit-btn').innerText = authMode === 'signup' ? 'Sign Up' : 'Log In';
         });
 

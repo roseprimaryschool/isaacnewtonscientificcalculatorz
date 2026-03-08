@@ -106,6 +106,10 @@
                         <h1>GAMES HUB</h1>
                     </div>
                     <div class="header-right">
+                        <nav class="main-nav">
+                            <button id="btn-nav-games" class="nav-btn active"><i data-lucide="gamepad-2"></i> Games</button>
+                            <button id="btn-nav-videos" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
+                        </nav>
                         <div id="user-profile" class="user-profile hidden">
                             <div class="user-info">
                                 <span id="display-username" class="username">Guest</span>
@@ -156,6 +160,48 @@
                     <div class="stats">
                         <span><i data-lucide="trophy"></i> 1.2M ACTIVE PLAYERS</span>
                         <span><i data-lucide="users"></i> 42 SERVERS ONLINE</span>
+                    </div>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Videos View -->
+        <div id="videos-view" class="view">
+            <div class="videos-container">
+                <header class="games-header">
+                    <div class="logo">
+                        <div class="icon-box"><i data-lucide="play-circle"></i></div>
+                        <h1>VIDEO HUB</h1>
+                    </div>
+                    <div class="header-right">
+                        <nav class="main-nav">
+                            <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
+                            <button class="nav-btn active"><i data-lucide="play-circle"></i> Videos</button>
+                        </nav>
+                        <button id="btn-exit-portal-videos" onclick="switchView('calculator')" class="exit-btn">
+                            <i data-lucide="arrow-left"></i> EXIT PORTAL
+                        </button>
+                    </div>
+                </header>
+
+                <div class="video-hero">
+                    <div class="hero-content">
+                        <span class="badge">Trending Now</span>
+                        <h2>The Future of Gaming</h2>
+                        <p>Explore the latest trailers, gameplay reveals, and community highlights.</p>
+                        <button class="hero-play-btn"><i data-lucide="play"></i> Watch Now</button>
+                    </div>
+                </div>
+
+                <div id="videos-grid" class="videos-grid">
+                    <!-- Videos will be loaded here -->
+                </div>
+
+                <footer class="games-footer">
+                    <div>© 2026 NOVA MEDIA NETWORK</div>
+                    <div class="stats">
+                        <span><i data-lucide="eye"></i> 5.4M MONTHLY VIEWS</span>
+                        <span><i data-lucide="video"></i> 12K VIDEOS</span>
                     </div>
                 </footer>
             </div>

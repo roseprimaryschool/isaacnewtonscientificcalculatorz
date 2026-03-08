@@ -160,31 +160,57 @@
         if (!grid) return;
 
         const videos = [
-            { id: 1, title: "Cyberpunk Drift", thumbnail: "https://picsum.photos/seed/drift/800/450", duration: "2:45", views: "1.2M" },
-            { id: 2, title: "Neon Nights", thumbnail: "https://picsum.photos/seed/neon/800/450", duration: "5:12", views: "850K" },
-            { id: 3, title: "Retro Wave", thumbnail: "https://picsum.photos/seed/retro/800/450", duration: "3:30", views: "2.1M" },
-            { id: 4, title: "Digital Horizon", thumbnail: "https://picsum.photos/seed/horizon/800/450", duration: "4:20", views: "500K" }
+            { 
+                id: 'j6CYhN22F1Pzg6FJYeej', 
+                title: "Nova Community Highlight", 
+                thumbnail: "https://picsum.photos/seed/nova-vid/800/450", 
+                duration: "0:45", 
+                views: "1.2K",
+                url: "https://jumpshare.com/embed/j6CYhN22F1Pzg6FJYeej"
+            }
         ];
 
-        grid.innerHTML = videos.map(vid => `
-            <div class="video-card">
-                <div class="video-thumb">
-                    <img src="${vid.thumbnail}" alt="${vid.title}" referrerPolicy="no-referrer">
-                    <span class="video-duration">${vid.duration}</span>
-                    <div class="video-play-overlay"><i data-lucide="play"></i></div>
+        if (videos.length === 0) {
+            grid.innerHTML = `
+                <div class="videos-empty">
+                    <i data-lucide="video-off"></i>
+                    <h3>New Content Coming Soon</h3>
+                    <p>We're currently updating our video library. Check back later for the latest gaming highlights!</p>
                 </div>
-                <div class="video-info">
-                    <h3 class="video-title">${vid.title}</h3>
-                    <div class="video-meta">
-                        <span>${vid.views} views</span>
-                        <span class="dot">•</span>
-                        <span>2 days ago</span>
+            `;
+        } else {
+            grid.innerHTML = videos.map(vid => `
+                <div class="video-card" onclick="playVideo('${vid.url}', '${vid.title.replace(/'/g, "\\'")}')">
+                    <div class="video-thumb">
+                        <img src="${vid.thumbnail}" alt="${vid.title}" referrerPolicy="no-referrer">
+                        <span class="video-duration">${vid.duration}</span>
+                        <div class="video-play-overlay"><i data-lucide="play"></i></div>
+                    </div>
+                    <div class="video-info">
+                        <h3 class="video-title">${vid.title}</h3>
+                        <div class="video-meta">
+                            <span>${vid.views} views</span>
+                            <span class="dot">•</span>
+                            <span>Just now</span>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
+        }
         if (window.lucide) window.lucide.createIcons();
     }
+
+    window.playVideo = function(url, title) {
+        const modal = document.getElementById('video-player-modal');
+        const titleEl = document.getElementById('video-player-title');
+        const container = document.getElementById('video-player-container');
+        
+        if (!modal || !container) return;
+
+        titleEl.innerText = title;
+        container.innerHTML = `<iframe src="${url}" allowfullscreen allow="autoplay; fullscreen"></iframe>`;
+        modal.classList.remove('hidden');
+    };
 
     // --- Auth ---
     async function handleAuth(e) {
@@ -401,6 +427,13 @@
         document.getElementById('btn-nav-games')?.addEventListener('click', () => switchView('games'));
         document.getElementById('btn-close-leaderboard')?.addEventListener('click', () => {
             document.getElementById('leaderboard-modal')?.classList.add('hidden');
+        });
+
+        document.getElementById('btn-close-video')?.addEventListener('click', () => {
+            const modal = document.getElementById('video-player-modal');
+            const container = document.getElementById('video-player-container');
+            if (modal) modal.classList.add('hidden');
+            if (container) container.innerHTML = ''; // Stop video playback
         });
         document.getElementById('btn-logout')?.addEventListener('click', () => {
             updatePlayTime();

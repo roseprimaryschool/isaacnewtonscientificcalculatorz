@@ -153,6 +153,7 @@
         }
         currentView = view;
     }
+    window.switchView = switchView;
 
     // --- Videos ---
     function loadVideos() {
@@ -162,9 +163,9 @@
         const videos = [
             { 
                 id: 'j6CYhN22F1Pzg6FJYeej', 
-                title: "Nova Community Highlight", 
-                thumbnail: "https://picsum.photos/seed/nova-vid/800/450", 
-                duration: "0:45", 
+                title: "I Spent 7 Days Buried Alive", 
+                thumbnail: "https://picsum.photos/seed/buried/800/450", 
+                duration: "18:40", 
                 views: "1.2K",
                 url: "https://jumpshare.com/embed/j6CYhN22F1Pzg6FJYeej"
             }
@@ -302,6 +303,12 @@
         try {
             const url = gameId ? `/api/leaderboard?gameId=${encodeURIComponent(gameId)}` : '/api/leaderboard';
             const res = await fetch(url);
+            
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.error || `Server error: ${res.status}`);
+            }
+
             const sortedUsers = await res.json();
 
             let html = sortedUsers.map((u, i) => {
@@ -409,8 +416,31 @@
         const player = document.getElementById('game-player');
         const iframe = document.getElementById('game-iframe');
         if (grid) grid.classList.remove('hidden');
-        if (player) player.classList.add('hidden');
+        if (player) {
+            player.classList.add('hidden');
+            player.classList.remove('pseudo-fullscreen');
+        }
         if (iframe) iframe.src = '';
+    }
+
+    function toggleFullscreen() {
+        const player = document.getElementById('game-player');
+        if (!player) return;
+
+        const requestFS = player.requestFullscreen || 
+                          player.webkitRequestFullscreen || 
+                          player.mozRequestFullScreen || 
+                          player.msRequestFullscreen;
+
+        if (requestFS) {
+            requestFS.call(player).catch(err => {
+                console.warn("Native fullscreen failed, using pseudo-fullscreen", err);
+                player.classList.toggle('pseudo-fullscreen');
+            });
+        } else {
+            // Fallback for iOS Safari
+            player.classList.toggle('pseudo-fullscreen');
+        }
     }
 
     // --- Init ---
@@ -421,6 +451,7 @@
         document.getElementById('btn-backspace')?.addEventListener('click', backspace);
         document.getElementById('btn-exit-portal')?.addEventListener('click', () => switchView('calculator'));
         document.getElementById('btn-back-to-hub')?.addEventListener('click', closeGame);
+        document.getElementById('btn-toggle-native-fs')?.addEventListener('click', toggleFullscreen);
         document.getElementById('btn-login-trigger')?.addEventListener('click', () => switchView('auth'));
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
         document.getElementById('btn-nav-videos')?.addEventListener('click', () => switchView('videos'));

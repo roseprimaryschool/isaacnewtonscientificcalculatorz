@@ -975,6 +975,23 @@ body.is-fullscreen .iframe-wrapper {
     border: none;
 }
 
+/* Pseudo-Fullscreen for Safari/iOS fallback */
+.game-player.pseudo-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: black;
+    padding: 0;
+    border-radius: 0;
+}
+
+.game-player.pseudo-fullscreen .iframe-wrapper {
+    height: calc(100vh - 60px);
+}
+
 .leaderboard-empty {
     padding: 48px 24px;
     text-align: center;

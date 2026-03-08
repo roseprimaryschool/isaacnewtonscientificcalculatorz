@@ -94,24 +94,31 @@ async function startServer() {
 
     // Get Leaderboard
     app.get("/api/leaderboard", async (req, res) => {
-        const { gameId } = req.query;
-        const db = await getDB();
-        
-        let sortedUsers;
-        if (gameId) {
-            const gId = gameId as string;
-            sortedUsers = db.users
-                .filter((u: any) => u.gameStats && u.gameStats[gId] > 0.0001)
-                .sort((a: any, b: any) => b.gameStats[gId] - a.gameStats[gId])
-                .map((u: any) => ({ username: u.username, score: u.gameStats[gId] }));
-        } else {
-            sortedUsers = db.users
-                .filter((u: any) => (u.totalHours || 0) > 0.0001)
-                .sort((a: any, b: any) => (b.totalHours || 0) - (a.totalHours || 0))
-                .map((u: any) => ({ username: u.username, score: u.totalHours }));
-        }
+        try {
+            const { gameId } = req.query;
+            console.log(`Leaderboard request for gameId: ${gameId || 'Global'}`);
+            const db = await getDB();
+            
+            let sortedUsers;
+            if (gameId) {
+                const gId = gameId as string;
+                sortedUsers = db.users
+                    .filter((u: any) => u.gameStats && u.gameStats[gId] > 0.0001)
+                    .sort((a: any, b: any) => b.gameStats[gId] - a.gameStats[gId])
+                    .map((u: any) => ({ username: u.username, score: u.gameStats[gId] }));
+            } else {
+                sortedUsers = db.users
+                    .filter((u: any) => (u.totalHours || 0) > 0.0001)
+                    .sort((a: any, b: any) => (b.totalHours || 0) - (a.totalHours || 0))
+                    .map((u: any) => ({ username: u.username, score: u.totalHours }));
+            }
 
-        res.json(sortedUsers.slice(0, 100)); // Top 100
+            console.log(`Returning ${sortedUsers.length} leaderboard entries`);
+            res.json(sortedUsers.slice(0, 100)); // Top 100
+        } catch (error) {
+            console.error('Leaderboard API Error:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
     });
 
     // Vite middleware for development

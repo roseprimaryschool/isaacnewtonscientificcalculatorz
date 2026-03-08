@@ -46,5 +46,13 @@
     "iframeUrl": "./escape-road.html",
     "color": "#ef4444",
     "category": "Action"
+  },
+  {
+    "id": "polytrack",
+    "title": "Polytrack",
+    "description": "Fast-paced low-poly racing game. Build tracks and race for the best time!",
+    "iframeUrl": "./polytrack.html",
+    "color": "#10b981",
+    "category": "Racing"
   }
 ]

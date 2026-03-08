@@ -1,0 +1,35 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Nova Media Network",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "The user's display name"
+        },
+        "totalHours": {
+          "type": "number",
+          "description": "Total hours played across all games"
+        },
+        "gameStats": {
+          "type": "object",
+          "description": "Map of gameId to hours played"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the user's stats were updated"
+        }
+      },
+      "required": ["username", "totalHours"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and stats"
+    }
+  }
+}

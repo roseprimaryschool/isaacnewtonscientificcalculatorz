@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      // Anyone authenticated can read user profiles (for leaderboard)
+      // But we should be careful if they contain PII. 
+      // Our blueprint says: username, totalHours, gameStats, updatedAt.
+      // No PII here.
+      allow read: if isAuthenticated();
+      
+      // Only the owner can create/update their own profile
+      allow create: if isOwner(userId) && 
+                      request.resource.data.username is string &&
+                      request.resource.data.totalHours is number;
+                      
+      allow update: if isOwner(userId) && 
+                      request.resource.data.username == resource.data.username && // Username immutable
+                      request.resource.data.totalHours is number;
+    }
+  }
+}

@@ -1,4 +1,10 @@
-// Nova Portal - Reverted to Simple Logic
+// Nova Portal - Firebase Integrated
+import { 
+    auth, db, 
+    signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut,
+    doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp
+} from './src/firebase.ts';
+
 (function() {
     // --- State ---
     let displayValue = '0';
@@ -12,9 +18,10 @@
     let gameStartTime = null;
     let currentGameId = null;
 
-    // --- Simple Local Auth Session ---
-    const getCurrentUser = () => JSON.parse(localStorage.getItem('nova_current_user') || 'null');
-    const setCurrentUser = (user) => localStorage.setItem('nova_current_user', JSON.stringify(user));
+    // --- Firebase Auth Session ---
+    let currentUserData = null;
+    const getCurrentUser = () => currentUserData;
+    const setCurrentUser = (user) => { currentUserData = user; };
 
     // --- Core Functions ---
     function updateDisplay() {
@@ -233,9 +240,7 @@
         modal.classList.remove('hidden');
     };
 
-    // --- Auth Logic (Hybrid: Server + Local Fallback) ---
-    const isStaticHost = window.location.hostname.includes('github.io') || !window.location.port && !window.location.hostname.includes('run.app');
-
+    // --- Firebase Auth Logic ---
     async function handleAuth(e) {
         e.preventDefault();
         const usernameEl = document.getElementById('auth-username');
@@ -255,63 +260,41 @@
             return;
         }
 
-        if (isStaticHost) {
-            // Local Mode for GitHub Pages
-            const localUsers = JSON.parse(localStorage.getItem('nova_users') || '[]');
-            if (authMode === 'signup') {
-                if (localUsers.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-                    errorEl.innerText = "Username taken (Local Mode)";
-                    errorEl.classList.remove('hidden');
-                    return;
-                }
-                const newUser = { username, password, totalHours: 0, gameStats: {} };
-                localUsers.push(newUser);
-                localStorage.setItem('nova_users', JSON.stringify(localUsers));
-                setCurrentUser(newUser);
-            } else {
-                const user = localUsers.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-                if (!user) {
-                    errorEl.innerText = "Invalid credentials (Local Mode)";
-                    errorEl.classList.remove('hidden');
-                    return;
-                }
-                setCurrentUser(user);
-            }
-            updateAuthUI();
-            switchView('games');
-            return;
-        }
+        // We use username as part of a dummy email for Firebase Auth
+        const email = `${username.toLowerCase().replace(/\s+/g, '')}@nova.media`;
 
         try {
-            const path = authMode === 'signup' ? 'api/auth/signup' : 'api/auth/login';
-            const url = new URL(path, window.location.href).href;
-            
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json' 
-                },
-                body: JSON.stringify({ username, password })
-            });
-
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Authentication failed');
-
-            setCurrentUser(data);
-            updateAuthUI();
+            if (authMode === 'signup') {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                // Create user profile in Firestore
+                await setDoc(doc(db, 'users', user.uid), {
+                    username: username,
+                    totalHours: 0,
+                    gameStats: {},
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                await signInWithEmailAndPassword(auth, email, password);
+            }
+            // onAuthStateChanged will handle the UI update
+            const modal = document.getElementById('auth-modal');
+            if (modal) modal.classList.add('hidden');
             switchView('games');
         } catch (err) {
             console.error('Auth Error:', err);
             if (errorEl) {
-                errorEl.innerText = "Server unavailable. Try again later or use Local Mode.";
+                let msg = "Authentication failed.";
+                if (err.code === 'auth/email-already-in-use') msg = "Username taken.";
+                if (err.code === 'auth/invalid-credential') msg = "Invalid credentials.";
+                if (err.code === 'auth/weak-password') msg = "Password too weak.";
+                errorEl.innerText = msg;
                 errorEl.classList.remove('hidden');
             }
         }
     }
 
-    function updateAuthUI() {
-        const user = getCurrentUser();
+    function updateAuthUI(user = null) {
         const loginBtn = document.getElementById('btn-login-trigger');
         const profile = document.getElementById('user-profile');
         const nameDisplay = document.getElementById('display-username');
@@ -319,59 +302,53 @@
         if (user) {
             if (loginBtn) loginBtn.classList.add('hidden');
             if (profile) profile.classList.remove('hidden');
-            if (nameDisplay) nameDisplay.innerText = user.username;
+            // Fetch username from Firestore if not already in state
+            if (currentUserData && currentUserData.username) {
+                if (nameDisplay) nameDisplay.innerText = currentUserData.username;
+            } else {
+                getDoc(doc(db, 'users', user.uid)).then(snap => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        setCurrentUser({ ...data, uid: user.uid });
+                        if (nameDisplay) nameDisplay.innerText = data.username;
+                    }
+                });
+            }
         } else {
             if (loginBtn) loginBtn.classList.remove('hidden');
             if (profile) profile.classList.add('hidden');
+            setCurrentUser(null);
         }
     }
 
-    // --- Leaderboard Logic ---
+    // --- Leaderboard Logic (Firestore) ---
     async function updatePlayTime() {
         if (!gameStartTime || !currentGameId) return;
         
-        const user = getCurrentUser();
+        const user = auth.currentUser;
         if (!user) return;
 
         const endTime = Date.now();
         const durationMs = endTime - gameStartTime;
         const durationHours = durationMs / (1000 * 60 * 60);
 
-        if (isStaticHost) {
-            const user = getCurrentUser();
-            if (user) {
-                user.totalHours = (user.totalHours || 0) + durationHours;
-                if (currentGameId) {
-                    if (!user.gameStats) user.gameStats = {};
-                    user.gameStats[currentGameId] = (user.gameStats[currentGameId] || 0) + durationHours;
-                }
-                setCurrentUser(user);
-                // Update in local storage list too
-                const localUsers = JSON.parse(localStorage.getItem('nova_users') || '[]');
-                const idx = localUsers.findIndex(u => u.username === user.username);
-                if (idx !== -1) {
-                    localUsers[idx] = user;
-                    localStorage.setItem('nova_users', JSON.stringify(localUsers));
-                }
-            }
-            gameStartTime = Date.now();
-            return;
-        }
-
         try {
-            const url = new URL('api/playtime', window.location.href).href;
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: user.username,
-                    gameId: currentGameId,
-                    durationHours: durationHours
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                setCurrentUser(data);
+            const userRef = doc(db, 'users', user.uid);
+            const snap = await getDoc(userRef);
+            if (snap.exists()) {
+                const data = snap.data();
+                const newTotal = (data.totalHours || 0) + durationHours;
+                const newGameStats = { ...(data.gameStats || {}) };
+                newGameStats[currentGameId] = (newGameStats[currentGameId] || 0) + durationHours;
+                
+                await updateDoc(userRef, {
+                    totalHours: newTotal,
+                    gameStats: newGameStats,
+                    updatedAt: serverTimestamp()
+                });
+                
+                // Update local state
+                setCurrentUser({ ...data, totalHours: newTotal, gameStats: newGameStats, uid: user.uid });
             }
         } catch (e) {
             console.error('Failed to update playtime:', e);
@@ -390,36 +367,24 @@
 
         title.innerText = gameId ? `Leaderboard: ${gameId}` : "Global Leaderboard";
         
-        if (isStaticHost) {
-            const localUsers = JSON.parse(localStorage.getItem('nova_users') || '[]');
-            let sorted;
-            if (gameId) {
-                sorted = localUsers
-                    .filter(u => u.gameStats && u.gameStats[gameId] > 0.0001)
-                    .sort((a, b) => b.gameStats[gameId] - a.gameStats[gameId])
-                    .map(u => ({ username: u.username, score: u.gameStats[gameId] }));
-            } else {
-                sorted = localUsers
-                    .filter(u => (u.totalHours || 0) > 0.0001)
-                    .sort((a, b) => (b.totalHours || 0) - (a.totalHours || 0))
-                    .map(u => ({ username: u.username, score: u.totalHours }));
-            }
-            renderLeaderboard(sorted);
-            modal.classList.remove('hidden');
-            return;
-        }
-
         try {
-            const path = gameId ? `api/leaderboard?gameId=${encodeURIComponent(gameId)}` : 'api/leaderboard';
-            const url = new URL(path, window.location.href).href;
-            const res = await fetch(url);
-            
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({}));
-                throw new Error(errorData.error || `Server error: ${res.status}`);
+            const usersCol = collection(db, 'users');
+            let q;
+            if (gameId) {
+                q = query(usersCol, orderBy(`gameStats.${gameId}`, 'desc'), limit(100));
+            } else {
+                q = query(usersCol, orderBy('totalHours', 'desc'), limit(100));
             }
+            
+            const snap = await getDocs(q);
+            const sortedUsers = snap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    username: data.username,
+                    score: gameId ? (data.gameStats[gameId] || 0) : (data.totalHours || 0)
+                };
+            }).filter(u => u.score > 0.0001);
 
-            const sortedUsers = await res.json();
             renderLeaderboard(sortedUsers);
             modal.classList.remove('hidden');
         } catch (e) {
@@ -594,10 +559,9 @@
             }
             if (container) container.innerHTML = ''; // Stop video playback
         });
-        document.getElementById('btn-logout')?.addEventListener('click', () => {
-            updatePlayTime();
-            setCurrentUser(null);
-            updateAuthUI();
+        document.getElementById('btn-logout')?.addEventListener('click', async () => {
+            await updatePlayTime();
+            await signOut(auth);
             switchView('calculator');
         });
 
@@ -629,8 +593,12 @@
 
         window.addEventListener('beforeunload', updatePlayTime);
 
+        // Firebase Auth Listener
+        onAuthStateChanged(auth, (user) => {
+            updateAuthUI(user);
+        });
+
         updateDisplay();
-        updateAuthUI();
         loadGames();
         if (window.lucide) window.lucide.createIcons();
     }

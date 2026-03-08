@@ -12,9 +12,7 @@
     let gameStartTime = null;
     let currentGameId = null;
 
-    // --- Simple Local Auth ---
-    const getUsers = () => JSON.parse(localStorage.getItem('nova_users') || '[]');
-    const saveUsers = (users) => localStorage.setItem('nova_users', JSON.stringify(users));
+    // --- Simple Local Auth Session ---
     const getCurrentUser = () => JSON.parse(localStorage.getItem('nova_current_user') || 'null');
     const setCurrentUser = (user) => localStorage.setItem('nova_current_user', JSON.stringify(user));
 
@@ -152,32 +150,24 @@
     }
 
     // --- Auth ---
-    function handleAuth(e) {
+    async function handleAuth(e) {
         e.preventDefault();
         const username = document.getElementById('auth-username').value.trim();
         const password = document.getElementById('auth-password').value;
         const errorEl = document.getElementById('auth-error');
 
         try {
-            const users = getUsers();
-            if (authMode === 'signup') {
-                if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-                    throw new Error('Username taken');
-                }
-                const newUser = { 
-                    username, 
-                    password, 
-                    totalHours: 0,
-                    gameStats: {} // { gameId: hours }
-                };
-                users.push(newUser);
-                saveUsers(users);
-                setCurrentUser(newUser);
-            } else {
-                const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-                if (!user) throw new Error('Invalid login');
-                setCurrentUser(user);
-            }
+            const endpoint = authMode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Auth failed');
+
+            setCurrentUser(data);
             updateAuthUI();
             switchView('games');
         } catch (err) {
@@ -205,7 +195,7 @@
     }
 
     // --- Leaderboard Logic ---
-    function updatePlayTime() {
+    async function updatePlayTime() {
         if (!gameStartTime || !currentGameId) return;
         
         const user = getCurrentUser();
@@ -215,22 +205,28 @@
         const durationMs = endTime - gameStartTime;
         const durationHours = durationMs / (1000 * 60 * 60);
 
-        const users = getUsers();
-        const userIdx = users.findIndex(u => u.username === user.username);
-        
-        if (userIdx !== -1) {
-            users[userIdx].totalHours = (users[userIdx].totalHours || 0) + durationHours;
-            if (!users[userIdx].gameStats) users[userIdx].gameStats = {};
-            users[userIdx].gameStats[currentGameId] = (users[userIdx].gameStats[currentGameId] || 0) + durationHours;
-            
-            saveUsers(users);
-            setCurrentUser(users[userIdx]);
+        try {
+            const res = await fetch('/api/playtime', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: user.username,
+                    gameId: currentGameId,
+                    durationHours: durationHours
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setCurrentUser(data);
+            }
+        } catch (e) {
+            console.error('Failed to update playtime:', e);
         }
 
         gameStartTime = Date.now(); // Reset for continuous tracking
     }
 
-    function showLeaderboard(gameId = null) {
+    async function showLeaderboard(gameId = null) {
         const modal = document.getElementById('leaderboard-modal');
         const title = document.getElementById('leaderboard-title');
         const list = document.getElementById('leaderboard-list');
@@ -240,53 +236,50 @@
 
         title.innerText = gameId ? `Leaderboard: ${gameId}` : "Global Leaderboard";
         
-        const users = getUsers();
-        let sortedUsers;
+        try {
+            const url = gameId ? `/api/leaderboard?gameId=${encodeURIComponent(gameId)}` : '/api/leaderboard';
+            const res = await fetch(url);
+            const sortedUsers = await res.json();
 
-        if (gameId) {
-            sortedUsers = [...users]
-                .filter(u => u.gameStats && u.gameStats[gameId] > 0.0001)
-                .sort((a, b) => b.gameStats[gameId] - a.gameStats[gameId]);
-        } else {
-            sortedUsers = [...users]
-                .filter(u => (u.totalHours || 0) > 0.0001)
-                .sort((a, b) => (b.totalHours || 0) - (a.totalHours || 0));
+            let html = sortedUsers.map((u, i) => {
+                const time = u.score;
+                const isMe = currentUser && u.username === currentUser.username;
+                let timeStr = time.toFixed(2) + 'h';
+                if (time > 0 && time < 0.01) timeStr = '< 0.01h';
+
+                return `
+                    <div class="leaderboard-item ${isMe ? 'current-user' : ''}">
+                        <span class="rank">${i + 1}</span>
+                        <span class="user-name">${u.username}</span>
+                        <span class="play-time">${timeStr}</span>
+                    </div>
+                `;
+            }).join('');
+
+            if (!html) {
+                html = `
+                    <div class="leaderboard-empty">
+                        <i data-lucide="info"></i>
+                        <p>No data recorded yet.</p>
+                        ${!currentUser ? '<p class="login-hint">Log in to start tracking your playtime!</p>' : ''}
+                    </div>
+                `;
+            } else if (!currentUser) {
+                html += `
+                    <div class="leaderboard-footer-hint">
+                        <p>Log in to see your rank and track time!</p>
+                    </div>
+                `;
+            }
+
+            list.innerHTML = html;
+            if (window.lucide) window.lucide.createIcons();
+            modal.classList.remove('hidden');
+        } catch (e) {
+            console.error('Failed to load leaderboard:', e);
+            list.innerHTML = '<div class="leaderboard-empty"><p>Failed to load leaderboard.</p></div>';
+            modal.classList.remove('hidden');
         }
-
-        let html = sortedUsers.map((u, i) => {
-            const time = gameId ? (u.gameStats[gameId] || 0) : (u.totalHours || 0);
-            const isMe = currentUser && u.username === currentUser.username;
-            let timeStr = time.toFixed(2) + 'h';
-            if (time > 0 && time < 0.01) timeStr = '< 0.01h';
-
-            return `
-                <div class="leaderboard-item ${isMe ? 'current-user' : ''}">
-                    <span class="rank">${i + 1}</span>
-                    <span class="user-name">${u.username}</span>
-                    <span class="play-time">${timeStr}</span>
-                </div>
-            `;
-        }).join('');
-
-        if (!html) {
-            html = `
-                <div class="leaderboard-empty">
-                    <i data-lucide="info"></i>
-                    <p>No data recorded yet.</p>
-                    ${!currentUser ? '<p class="login-hint">Log in to start tracking your playtime!</p>' : ''}
-                </div>
-            `;
-        } else if (!currentUser) {
-            html += `
-                <div class="leaderboard-footer-hint">
-                    <p>Log in to see your rank and track time!</p>
-                </div>
-            `;
-        }
-
-        list.innerHTML = html;
-        if (window.lucide) window.lucide.createIcons();
-        modal.classList.remove('hidden');
     }
 
     // --- Games ---

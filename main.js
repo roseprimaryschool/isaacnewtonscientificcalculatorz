@@ -216,27 +216,46 @@
     // --- Auth ---
     async function handleAuth(e) {
         e.preventDefault();
-        const username = document.getElementById('auth-username').value.trim();
-        const password = document.getElementById('auth-password').value;
+        const usernameEl = document.getElementById('auth-username');
+        const passwordEl = document.getElementById('auth-password');
         const errorEl = document.getElementById('auth-error');
+        
+        if (!usernameEl || !passwordEl) return;
+        
+        const username = usernameEl.value.trim();
+        const password = passwordEl.value;
+
+        if (!username || !password) {
+            if (errorEl) {
+                errorEl.innerText = "Username and password are required";
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
 
         try {
-            const endpoint = authMode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
-            const res = await fetch(endpoint, {
+            const path = authMode === 'signup' ? 'api/auth/signup' : 'api/auth/login';
+            const url = new URL(path, window.location.href).href;
+            
+            const res = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json' 
+                },
                 body: JSON.stringify({ username, password })
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Auth failed');
+            if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
             setCurrentUser(data);
             updateAuthUI();
             switchView('games');
         } catch (err) {
+            console.error('Auth Error:', err);
             if (errorEl) {
-                errorEl.innerText = err.message;
+                errorEl.innerText = err.message || 'An unexpected error occurred';
                 errorEl.classList.remove('hidden');
             }
         }
@@ -270,7 +289,8 @@
         const durationHours = durationMs / (1000 * 60 * 60);
 
         try {
-            const res = await fetch('/api/playtime', {
+            const url = new URL('api/playtime', window.location.href).href;
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -301,7 +321,8 @@
         title.innerText = gameId ? `Leaderboard: ${gameId}` : "Global Leaderboard";
         
         try {
-            const url = gameId ? `/api/leaderboard?gameId=${encodeURIComponent(gameId)}` : '/api/leaderboard';
+            const path = gameId ? `api/leaderboard?gameId=${encodeURIComponent(gameId)}` : 'api/leaderboard';
+            const url = new URL(path, window.location.href).href;
             const res = await fetch(url);
             
             if (!res.ok) {
@@ -356,7 +377,8 @@
     async function loadGames() {
         try {
             console.log('Loading games...');
-            const res = await fetch(`./games.json?v=${Date.now()}`);
+            const url = new URL('games.json', window.location.href).href;
+            const res = await fetch(`${url}?v=${Date.now()}`);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const games = await res.json();
             console.log('Games loaded:', games.length);
@@ -423,20 +445,26 @@
         if (iframe) iframe.src = '';
     }
 
-    function toggleFullscreen() {
-        const player = document.getElementById('game-player');
+    function toggleFullscreen(elementId = 'game-player') {
+        const player = document.getElementById(elementId);
         if (!player) return;
 
         const requestFS = player.requestFullscreen || 
                           player.webkitRequestFullscreen || 
+                          player.webkitEnterFullscreen ||
                           player.mozRequestFullScreen || 
                           player.msRequestFullscreen;
 
         if (requestFS) {
-            requestFS.call(player).catch(err => {
-                console.warn("Native fullscreen failed, using pseudo-fullscreen", err);
-                player.classList.toggle('pseudo-fullscreen');
-            });
+            // For iOS Safari, webkitEnterFullscreen only works on video elements
+            // but we'll try the standard way first
+            const promise = requestFS.call(player);
+            if (promise && promise.catch) {
+                promise.catch(err => {
+                    console.warn("Native fullscreen failed, using pseudo-fullscreen", err);
+                    player.classList.toggle('pseudo-fullscreen');
+                });
+            }
         } else {
             // Fallback for iOS Safari
             player.classList.toggle('pseudo-fullscreen');
@@ -451,7 +479,8 @@
         document.getElementById('btn-backspace')?.addEventListener('click', backspace);
         document.getElementById('btn-exit-portal')?.addEventListener('click', () => switchView('calculator'));
         document.getElementById('btn-back-to-hub')?.addEventListener('click', closeGame);
-        document.getElementById('btn-toggle-native-fs')?.addEventListener('click', toggleFullscreen);
+        document.getElementById('btn-toggle-native-fs')?.addEventListener('click', () => toggleFullscreen('game-player'));
+        document.getElementById('btn-video-fs')?.addEventListener('click', () => toggleFullscreen('video-player-modal'));
         document.getElementById('btn-login-trigger')?.addEventListener('click', () => switchView('auth'));
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
         document.getElementById('btn-nav-videos')?.addEventListener('click', () => switchView('videos'));
@@ -463,7 +492,10 @@
         document.getElementById('btn-close-video')?.addEventListener('click', () => {
             const modal = document.getElementById('video-player-modal');
             const container = document.getElementById('video-player-container');
-            if (modal) modal.classList.add('hidden');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('pseudo-fullscreen');
+            }
             if (container) container.innerHTML = ''; // Stop video playback
         });
         document.getElementById('btn-logout')?.addEventListener('click', () => {

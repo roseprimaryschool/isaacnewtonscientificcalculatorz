@@ -992,6 +992,55 @@ body.is-fullscreen .iframe-wrapper {
     height: calc(100vh - 60px);
 }
 
+.video-player-controls {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.5);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.video-fs-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.video-fs-btn:hover {
+    transform: scale(1.05);
+    filter: brightness(1.1);
+}
+
+#video-player-modal.pseudo-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: black;
+}
+
+#video-player-modal.pseudo-fullscreen .video-modal-content {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    border-radius: 0;
+}
+
+#video-player-modal.pseudo-fullscreen .video-frame-wrapper {
+    height: calc(100vh - 60px);
+}
+
 .leaderboard-empty {
     padding: 48px 24px;
     text-align: center;

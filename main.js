@@ -208,8 +208,28 @@
         
         if (!modal || !container) return;
 
-        titleEl.innerText = title;
-        container.innerHTML = `<iframe src="${url}" allowfullscreen allow="autoplay; fullscreen"></iframe>`;
+        if (titleEl) titleEl.innerText = title;
+        
+        // Detect if it's a direct video file or from a known direct-link host
+        const isDirectVideo = url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
+                             url.includes('discordapp.com') || 
+                             url.includes('github.com') ||
+                             url.includes('dropbox.com');
+        
+        if (isDirectVideo) {
+            // Handle Dropbox links (replace dl=0 with dl=1 for direct access)
+            const videoUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+            
+            container.innerHTML = `
+                <video id="native-video-player" controls playsinline class="native-video" style="width: 100%; height: 100%; background: black;">
+                    <source src="${videoUrl}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            `;
+        } else {
+            container.innerHTML = `<iframe src="${url}" allowfullscreen allow="autoplay; fullscreen" style="width: 100%; height: 100%; border: none;"></iframe>`;
+        }
+        
         modal.classList.remove('hidden');
     };
 

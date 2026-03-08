@@ -244,26 +244,48 @@
         let sortedUsers;
 
         if (gameId) {
-            sortedUsers = users
-                .filter(u => u.gameStats && u.gameStats[gameId])
+            sortedUsers = [...users]
+                .filter(u => u.gameStats && u.gameStats[gameId] > 0.0001)
                 .sort((a, b) => b.gameStats[gameId] - a.gameStats[gameId]);
         } else {
-            sortedUsers = users
+            sortedUsers = [...users]
+                .filter(u => (u.totalHours || 0) > 0.0001)
                 .sort((a, b) => (b.totalHours || 0) - (a.totalHours || 0));
         }
 
-        list.innerHTML = sortedUsers.map((u, i) => {
+        let html = sortedUsers.map((u, i) => {
             const time = gameId ? (u.gameStats[gameId] || 0) : (u.totalHours || 0);
             const isMe = currentUser && u.username === currentUser.username;
+            let timeStr = time.toFixed(2) + 'h';
+            if (time > 0 && time < 0.01) timeStr = '< 0.01h';
+
             return `
                 <div class="leaderboard-item ${isMe ? 'current-user' : ''}">
                     <span class="rank">${i + 1}</span>
                     <span class="user-name">${u.username}</span>
-                    <span class="play-time">${time.toFixed(2)}h</span>
+                    <span class="play-time">${timeStr}</span>
                 </div>
             `;
-        }).join('') || '<div class="leaderboard-item"><span class="user-name">No data yet</span></div>';
+        }).join('');
 
+        if (!html) {
+            html = `
+                <div class="leaderboard-empty">
+                    <i data-lucide="info"></i>
+                    <p>No data recorded yet.</p>
+                    ${!currentUser ? '<p class="login-hint">Log in to start tracking your playtime!</p>' : ''}
+                </div>
+            `;
+        } else if (!currentUser) {
+            html += `
+                <div class="leaderboard-footer-hint">
+                    <p>Log in to see your rank and track time!</p>
+                </div>
+            `;
+        }
+
+        list.innerHTML = html;
+        if (window.lucide) window.lucide.createIcons();
         modal.classList.remove('hidden');
     }
 
@@ -277,22 +299,25 @@
             console.log('Games loaded:', games.length);
             const grid = document.getElementById('games-grid');
             if (grid) {
-                grid.innerHTML = games.map(game => `
-                    <div class="game-card">
-                        <div class="game-icon" style="background-color: ${game.color}">
-                            <i data-lucide="gamepad-2"></i>
+                grid.innerHTML = games.map(game => {
+                    const gameTitleJson = JSON.stringify(game.title).replace(/"/g, '&quot;');
+                    return `
+                        <div class="game-card">
+                            <div class="game-icon" style="background-color: ${game.color}">
+                                <i data-lucide="gamepad-2"></i>
+                            </div>
+                            <div class="game-category">${game.category}</div>
+                            <h3 class="game-title">${game.title}</h3>
+                            <p class="game-desc">${game.description}</p>
+                            <div class="game-actions">
+                                <button class="play-btn" onclick="playGame(${JSON.stringify(game).replace(/"/g, '&quot;')})">PLAY</button>
+                                <button class="game-leaderboard-btn" onclick="event.stopPropagation(); showLeaderboard(${gameTitleJson})" title="Game Leaderboard">
+                                    <i data-lucide="trophy"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="game-category">${game.category}</div>
-                        <h3 class="game-title">${game.title}</h3>
-                        <p class="game-desc">${game.description}</p>
-                        <div class="game-actions">
-                            <button class="play-btn" onclick="playGame(${JSON.stringify(game).replace(/"/g, '&quot;')})">PLAY</button>
-                            <button class="game-leaderboard-btn" onclick="event.stopPropagation(); showLeaderboard('${game.title}')" title="Game Leaderboard">
-                                <i data-lucide="trophy"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
                 if (window.lucide) window.lucide.createIcons();
             }
         } catch (e) {
@@ -376,6 +401,8 @@
 
         // Periodic update of playtime if game is open
         setInterval(updatePlayTime, 30000); // Every 30 seconds
+
+        window.addEventListener('beforeunload', updatePlayTime);
 
         updateDisplay();
         updateAuthUI();

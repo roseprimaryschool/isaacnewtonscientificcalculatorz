@@ -138,7 +138,10 @@
 
         let target;
         if (view === 'calculator') target = calcView;
-        else if (view === 'games') target = gamesView;
+        else if (view === 'games') {
+            target = gamesView;
+            loadGames(); // Refresh games list when entering hub
+        }
         else target = authView;
 
         if (target) {
@@ -267,8 +270,11 @@
     // --- Games ---
     async function loadGames() {
         try {
-            const res = await fetch('./games.json');
+            console.log('Loading games...');
+            const res = await fetch(`./games.json?v=${Date.now()}`);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const games = await res.json();
+            console.log('Games loaded:', games.length);
             const grid = document.getElementById('games-grid');
             if (grid) {
                 grid.innerHTML = games.map(game => `
@@ -289,7 +295,9 @@
                 `).join('');
                 if (window.lucide) window.lucide.createIcons();
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error('Failed to load games:', e);
+        }
     }
 
     window.showLeaderboard = showLeaderboard;

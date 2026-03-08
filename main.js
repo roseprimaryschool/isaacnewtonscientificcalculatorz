@@ -233,7 +233,9 @@
         modal.classList.remove('hidden');
     };
 
-    // --- Auth ---
+    // --- Auth Logic (Hybrid: Server + Local Fallback) ---
+    const isStaticHost = window.location.hostname.includes('github.io') || !window.location.port && !window.location.hostname.includes('run.app');
+
     async function handleAuth(e) {
         e.preventDefault();
         const usernameEl = document.getElementById('auth-username');
@@ -250,6 +252,33 @@
                 errorEl.innerText = "Username and password are required";
                 errorEl.classList.remove('hidden');
             }
+            return;
+        }
+
+        if (isStaticHost) {
+            // Local Mode for GitHub Pages
+            const localUsers = JSON.parse(localStorage.getItem('nova_users') || '[]');
+            if (authMode === 'signup') {
+                if (localUsers.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+                    errorEl.innerText = "Username taken (Local Mode)";
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+                const newUser = { username, password, totalHours: 0, gameStats: {} };
+                localUsers.push(newUser);
+                localStorage.setItem('nova_users', JSON.stringify(localUsers));
+                setCurrentUser(newUser);
+            } else {
+                const user = localUsers.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+                if (!user) {
+                    errorEl.innerText = "Invalid credentials (Local Mode)";
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+                setCurrentUser(user);
+            }
+            updateAuthUI();
+            switchView('games');
             return;
         }
 
@@ -275,7 +304,7 @@
         } catch (err) {
             console.error('Auth Error:', err);
             if (errorEl) {
-                errorEl.innerText = err.message || 'An unexpected error occurred';
+                errorEl.innerText = "Server unavailable. Try again later or use Local Mode.";
                 errorEl.classList.remove('hidden');
             }
         }
@@ -307,6 +336,27 @@
         const endTime = Date.now();
         const durationMs = endTime - gameStartTime;
         const durationHours = durationMs / (1000 * 60 * 60);
+
+        if (isStaticHost) {
+            const user = getCurrentUser();
+            if (user) {
+                user.totalHours = (user.totalHours || 0) + durationHours;
+                if (currentGameId) {
+                    if (!user.gameStats) user.gameStats = {};
+                    user.gameStats[currentGameId] = (user.gameStats[currentGameId] || 0) + durationHours;
+                }
+                setCurrentUser(user);
+                // Update in local storage list too
+                const localUsers = JSON.parse(localStorage.getItem('nova_users') || '[]');
+                const idx = localUsers.findIndex(u => u.username === user.username);
+                if (idx !== -1) {
+                    localUsers[idx] = user;
+                    localStorage.setItem('nova_users', JSON.stringify(localUsers));
+                }
+            }
+            gameStartTime = Date.now();
+            return;
+        }
 
         try {
             const url = new URL('api/playtime', window.location.href).href;
@@ -340,6 +390,25 @@
 
         title.innerText = gameId ? `Leaderboard: ${gameId}` : "Global Leaderboard";
         
+        if (isStaticHost) {
+            const localUsers = JSON.parse(localStorage.getItem('nova_users') || '[]');
+            let sorted;
+            if (gameId) {
+                sorted = localUsers
+                    .filter(u => u.gameStats && u.gameStats[gameId] > 0.0001)
+                    .sort((a, b) => b.gameStats[gameId] - a.gameStats[gameId])
+                    .map(u => ({ username: u.username, score: u.gameStats[gameId] }));
+            } else {
+                sorted = localUsers
+                    .filter(u => (u.totalHours || 0) > 0.0001)
+                    .sort((a, b) => (b.totalHours || 0) - (a.totalHours || 0))
+                    .map(u => ({ username: u.username, score: u.totalHours }));
+            }
+            renderLeaderboard(sorted);
+            modal.classList.remove('hidden');
+            return;
+        }
+
         try {
             const path = gameId ? `api/leaderboard?gameId=${encodeURIComponent(gameId)}` : 'api/leaderboard';
             const url = new URL(path, window.location.href).href;
@@ -351,46 +420,53 @@
             }
 
             const sortedUsers = await res.json();
-
-            let html = sortedUsers.map((u, i) => {
-                const time = u.score;
-                const isMe = currentUser && u.username === currentUser.username;
-                let timeStr = time.toFixed(2) + 'h';
-                if (time > 0 && time < 0.01) timeStr = '< 0.01h';
-
-                return `
-                    <div class="leaderboard-item ${isMe ? 'current-user' : ''}">
-                        <span class="rank">${i + 1}</span>
-                        <span class="user-name">${u.username}</span>
-                        <span class="play-time">${timeStr}</span>
-                    </div>
-                `;
-            }).join('');
-
-            if (!html) {
-                html = `
-                    <div class="leaderboard-empty">
-                        <i data-lucide="info"></i>
-                        <p>No data recorded yet.</p>
-                        ${!currentUser ? '<p class="login-hint">Log in to start tracking your playtime!</p>' : ''}
-                    </div>
-                `;
-            } else if (!currentUser) {
-                html += `
-                    <div class="leaderboard-footer-hint">
-                        <p>Log in to see your rank and track time!</p>
-                    </div>
-                `;
-            }
-
-            list.innerHTML = html;
-            if (window.lucide) window.lucide.createIcons();
+            renderLeaderboard(sortedUsers);
             modal.classList.remove('hidden');
         } catch (e) {
             console.error('Failed to load leaderboard:', e);
             list.innerHTML = '<div class="leaderboard-empty"><p>Failed to load leaderboard.</p></div>';
             modal.classList.remove('hidden');
         }
+    }
+
+    function renderLeaderboard(sortedUsers) {
+        const list = document.getElementById('leaderboard-list');
+        const currentUser = getCurrentUser();
+        if (!list) return;
+
+        let html = sortedUsers.map((u, i) => {
+            const time = u.score;
+            const isMe = currentUser && u.username === currentUser.username;
+            let timeStr = time.toFixed(2) + 'h';
+            if (time > 0 && time < 0.01) timeStr = '< 0.01h';
+
+            return `
+                <div class="leaderboard-item ${isMe ? 'current-user' : ''}">
+                    <span class="rank">${i + 1}</span>
+                    <span class="user-name">${u.username} ${isMe ? '(You)' : ''}</span>
+                    <span class="play-time">${timeStr}</span>
+                </div>
+            `;
+        }).join('');
+
+        if (!html) {
+            html = `
+                <div class="leaderboard-empty">
+                    <i data-lucide="info"></i>
+                    <p>No data recorded yet.</p>
+                    ${!currentUser ? '<p class="login-hint">Log in to start tracking your playtime!</p>' : ''}
+                </div>
+            `;
+        } else if (!currentUser) {
+            html += `
+                <div class="leaderboard-footer-hint">
+                    <p>Log in to see your rank and track time!</p>
+                </div>
+            `;
+        }
+
+        list.innerHTML = html;
+        if (window.lucide) window.lucide.createIcons();
     }
 
     // --- Games ---

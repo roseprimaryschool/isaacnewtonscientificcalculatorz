@@ -1,11 +1,9 @@
 // Nova Portal - Firebase Integrated
-console.log('Nova Portal: Module loading...');
 import { 
     auth, db, 
     signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut,
     doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp
-} from './src/firebase.ts';
-console.log('Nova Portal: Firebase imported.');
+} from './src/firebase.js';
 
 (function() {
     // --- State ---
@@ -536,7 +534,6 @@ console.log('Nova Portal: Firebase imported.');
 
     // --- Init ---
     function init() {
-        console.log('Nova Portal: Initializing...');
         // Attach Listeners
         document.getElementById('btn-clear')?.addEventListener('click', clear);
         document.getElementById('btn-equal')?.addEventListener('click', calculate);
@@ -608,10 +605,8 @@ console.log('Nova Portal: Firebase imported.');
 
     // Since this is a module, it's already deferred.
     // Call init directly or check readyState.
-    console.log('Nova Portal: Checking document readyState:', document.readyState);
     if (document.readyState === 'loading') {
         window.addEventListener('DOMContentLoaded', () => {
-            console.log('Nova Portal: DOMContentLoaded fired.');
             init();
         });
     } else {

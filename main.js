@@ -196,6 +196,12 @@ const auth = getAuth(app);
             }
         ];
 
+        // Setup Hero Button
+        const heroBtn = document.querySelector('.hero-play-btn');
+        if (heroBtn && videos.length > 0) {
+            heroBtn.onclick = () => playVideo(videos[0].url, videos[0].title);
+        }
+
         if (videos.length === 0) {
             grid.innerHTML = `
                 <div class="videos-empty">
@@ -254,8 +260,8 @@ const auth = getAuth(app);
             if (url.includes('drive.google.com')) {
                 const driveId = url.match(/\/d\/([^/]+)/)?.[1] || url.match(/id=([^&]+)/)?.[1];
                 if (driveId) {
-                    // This uses the direct usercontent link which works for most files
-                    videoUrl = `https://drive.google.com/uc?export=download&id=${driveId}`;
+                    // Using the direct usercontent link
+                    videoUrl = `https://drive.google.com/uc?id=${driveId}&export=download`;
                 }
             }
             
@@ -270,6 +276,11 @@ const auth = getAuth(app);
                         <h3 style="margin-bottom: 10px;">Unable to Stream Directly</h3>
                         <p style="font-size: 14px; opacity: 0.8; max-width: 300px;">This file might be too large (>100MB) for direct streaming from Google Drive.</p>
                         <a href="${url}" target="_blank" style="margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border-radius: 5px; text-decoration: none;">Open in Drive</a>
+                    </div>
+                    <div class="video-overlay-actions" style="position: absolute; bottom: 60px; right: 20px; z-index: 10;">
+                        <a href="${videoUrl}" download class="direct-download-btn" style="background: rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; text-decoration: none; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">
+                            <i data-lucide="download" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 5px;"></i> Direct Link
+                        </a>
                     </div>
                 </div>
             `;

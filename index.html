@@ -109,7 +109,7 @@
                         <nav class="main-nav">
                             <button onclick="switchView('games')" class="nav-btn active"><i data-lucide="gamepad-2"></i> Games</button>
                             <button onclick="switchView('videos')" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
-                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
+                            <button id="btn-open-shop" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <div id="user-profile" class="user-profile hidden">
                             <div class="coin-display">
@@ -181,8 +181,8 @@
                     <div class="header-right">
                         <nav class="main-nav">
                             <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
-                            <button class="nav-btn active"><i data-lucide="play-circle"></i> Videos</button>
-                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
+                            <button onclick="switchView('videos')" class="nav-btn active"><i data-lucide="play-circle"></i> Videos</button>
+                            <button id="btn-open-shop-videos" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <button id="btn-exit-portal-videos" onclick="switchView('calculator')" class="exit-btn">
                             <i data-lucide="arrow-left"></i> EXIT PORTAL
@@ -214,7 +214,7 @@
         </div>
 
         <!-- Shop View -->
-        <div id="shop-view" class="view">
+        <div id="nova-shop-view" class="view">
             <div class="shop-container">
                 <header class="games-header">
                     <div class="logo">

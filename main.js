@@ -152,7 +152,7 @@ const auth = getAuth(app);
         const gamesView = document.getElementById('games-view');
         const authView = document.getElementById('auth-view');
         const videosView = document.getElementById('videos-view');
-        const shopView = document.getElementById('shop-view');
+        const shopView = document.getElementById('nova-shop-view');
         
         [calcView, gamesView, authView, videosView, shopView].forEach(v => {
             if (v) {
@@ -162,20 +162,23 @@ const auth = getAuth(app);
         });
 
         let target;
-        if (view === 'calculator') target = calcView;
-        else if (view === 'games') {
-            target = gamesView;
-            loadGames();
+        switch(view) {
+            case 'calculator': target = calcView; break;
+            case 'games': 
+                target = gamesView; 
+                loadGames(); 
+                break;
+            case 'videos': 
+                target = videosView; 
+                loadVideos(); 
+                break;
+            case 'shop': 
+                target = shopView; 
+                loadShop(); 
+                break;
+            case 'auth': target = authView; break;
+            default: target = authView;
         }
-        else if (view === 'videos') {
-            target = videosView;
-            loadVideos();
-        }
-        else if (view === 'shop') {
-            target = shopView;
-            loadShop();
-        }
-        else target = authView;
 
         if (target) {
             target.style.display = 'flex';
@@ -768,6 +771,8 @@ const auth = getAuth(app);
         document.getElementById('btn-video-fs')?.addEventListener('click', () => toggleFullscreen('video-player-modal'));
         document.getElementById('btn-login-trigger')?.addEventListener('click', () => switchView('auth'));
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
+        document.getElementById('btn-open-shop')?.addEventListener('click', () => switchView('shop'));
+        document.getElementById('btn-open-shop-videos')?.addEventListener('click', () => switchView('shop'));
         document.getElementById('btn-close-leaderboard')?.addEventListener('click', () => {
             document.getElementById('leaderboard-modal')?.classList.add('hidden');
         });

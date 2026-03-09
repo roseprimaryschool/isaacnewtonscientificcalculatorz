@@ -192,7 +192,7 @@ const auth = getAuth(app);
                 thumbnail: "https://img.youtube.com/vi/0e3GPea1Tyg/maxresdefault.jpg", 
                 duration: "18:40", 
                 views: "200M",
-                url: "https://www.youtube.com/embed/0e3GPea1Tyg"
+                url: "https://www.youtube-nocookie.com/embed/0e3GPea1Tyg"
             }
         ];
 

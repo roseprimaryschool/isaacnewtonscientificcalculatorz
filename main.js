@@ -241,12 +241,29 @@ const auth = getAuth(app);
 
         if (titleEl) titleEl.innerText = title;
         
+        // Handle Google Drive links specifically with a bypass strategy
+        if (url.includes('drive.google.com')) {
+            const driveId = url.match(/\/d\/([^/]+)/)?.[1] || url.match(/id=([^&]+)/)?.[1];
+            if (driveId) {
+                // Using docs.google.com instead of drive.google.com often bypasses filters
+                // Using <embed> instead of <iframe> often bypasses iframe-specific blocks
+                // This also avoids CORS issues entirely as it's a document embed
+                const bypassUrl = `https://docs.google.com/file/d/${driveId}/preview`;
+                container.innerHTML = `
+                    <div class="video-embed-wrapper" style="width: 100%; height: 100%; background: black;">
+                        <embed src="${bypassUrl}" style="width: 100%; height: 100%; border: none;" allowfullscreen="true">
+                    </div>
+                `;
+                modal.classList.remove('hidden');
+                return;
+            }
+        }
+
         // Detect if it's a direct video file or from a known direct-link host
         const isDirectVideo = url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
                              url.includes('discordapp.com') || 
                              url.includes('github.com') ||
-                             url.includes('dropbox.com') ||
-                             url.includes('drive.google.com');
+                             url.includes('dropbox.com');
         
         if (isDirectVideo) {
             let videoUrl = url;
@@ -256,64 +273,14 @@ const auth = getAuth(app);
                 videoUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
             }
             
-            // Handle Google Drive links (Direct Stream)
-            if (url.includes('drive.google.com')) {
-                const driveId = url.match(/\/d\/([^/]+)/)?.[1] || url.match(/id=([^&]+)/)?.[1];
-                if (driveId) {
-                    videoUrl = `https://drive.google.com/uc?id=${driveId}&export=download`;
-                }
-            }
-            
             container.innerHTML = `
                 <div class="native-video-wrapper" style="width: 100%; height: 100%; position: relative; background: black;">
                     <video id="native-video-player" playsinline controls style="width: 100%; height: 100%;">
-                        <source src="${videoUrl}" type="video/mp4" size="1080">
-                        <source src="${videoUrl}" type="video/mp4" size="720">
-                        <source src="${videoUrl}" type="video/mp4" size="480">
+                        <source src="${videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
                     </video>
-                    <div id="video-error-msg" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); color: white; text-align: center; padding: 20px; z-index: 100;">
-                        <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: #ff4444; margin-bottom: 15px;"></i>
-                        <h3 style="margin-bottom: 10px;">Unable to Stream Directly</h3>
-                        <p style="font-size: 14px; opacity: 0.8; max-width: 300px;">This file might be too large (>100MB) for direct streaming from Google Drive or blocked by CORS.</p>
-                        <a href="${url}" target="_blank" style="margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border-radius: 5px; text-decoration: none;">Open in Drive</a>
-                    </div>
                 </div>
             `;
-
-            // Initialize Plyr for the native player
-            if (window.Plyr) {
-                const player = new window.Plyr('#native-video-player', {
-                    quality: {
-                        default: 1080,
-                        options: [1080, 720, 480],
-                        forced: true,
-                        onChange: (quality) => {
-                            console.log('Quality changed to:', quality);
-                            // For Drive links, we simulate quality by reloading the stream
-                            // In a real production environment with multiple source files, 
-                            // this would switch between actual different resolution files.
-                        }
-                    },
-                    controls: [
-                        'play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
-                    ]
-                });
-
-                // Handle errors
-                player.on('error', () => {
-                    document.getElementById('video-error-msg')?.classList.remove('hidden');
-                });
-            } else {
-                // Fallback if Plyr fails to load
-                const video = document.getElementById('native-video-player');
-                if (video) {
-                    video.onerror = () => {
-                        document.getElementById('video-error-msg')?.classList.remove('hidden');
-                    };
-                }
-            }
-            
-            if (window.lucide) window.lucide.createIcons();
         } else {
             container.innerHTML = `<iframe src="${url}" allowfullscreen allow="autoplay; fullscreen" style="width: 100%; height: 100%; border: none;"></iframe>`;
         }

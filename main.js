@@ -187,12 +187,12 @@ const auth = getAuth(app);
 
         const videos = [
             { 
-                id: 'j6CYhN22F1Pzg6FJYeej', 
+                id: 'buried-alive', 
                 title: "I Spent 7 Days Buried Alive", 
-                thumbnail: "https://picsum.photos/seed/buried/800/450", 
+                thumbnail: "https://img.youtube.com/vi/0e3GPea1Tyg/maxresdefault.jpg", 
                 duration: "18:40", 
-                views: "1.2K",
-                url: "https://jumpshare.com/embed/j6CYhN22F1Pzg6FJYeej"
+                views: "200M",
+                url: "https://www.youtube.com/embed/0e3GPea1Tyg"
             }
         ];
 

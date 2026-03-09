@@ -235,24 +235,12 @@ const auth = getAuth(app);
 
         if (titleEl) titleEl.innerText = title;
         
-        // Handle Google Drive links specifically
-        // We use the /preview link in an iframe because direct download links 
-        // fail for files > 100MB due to Google's virus scan warning page.
-        if (url.includes('drive.google.com')) {
-            const driveId = url.match(/\/d\/([^/]+)/)?.[1];
-            if (driveId) {
-                const previewUrl = `https://drive.google.com/file/d/${driveId}/preview`;
-                container.innerHTML = `<iframe src="${previewUrl}" allowfullscreen allow="autoplay; fullscreen" style="width: 100%; height: 100%; border: none;"></iframe>`;
-                modal.classList.remove('hidden');
-                return;
-            }
-        }
-
         // Detect if it's a direct video file or from a known direct-link host
         const isDirectVideo = url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
                              url.includes('discordapp.com') || 
                              url.includes('github.com') ||
-                             url.includes('dropbox.com');
+                             url.includes('dropbox.com') ||
+                             url.includes('drive.google.com');
         
         if (isDirectVideo) {
             let videoUrl = url;
@@ -262,12 +250,38 @@ const auth = getAuth(app);
                 videoUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
             }
             
+            // Handle Google Drive links (Direct Stream)
+            if (url.includes('drive.google.com')) {
+                const driveId = url.match(/\/d\/([^/]+)/)?.[1] || url.match(/id=([^&]+)/)?.[1];
+                if (driveId) {
+                    // This uses the direct usercontent link which works for most files
+                    videoUrl = `https://drive.google.com/uc?export=download&id=${driveId}`;
+                }
+            }
+            
             container.innerHTML = `
-                <video id="native-video-player" controls playsinline class="native-video" style="width: 100%; height: 100%; background: black;">
-                    <source src="${videoUrl}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
+                <div class="native-video-wrapper" style="width: 100%; height: 100%; position: relative; background: black;">
+                    <video id="native-video-player" controls playsinline class="native-video" style="width: 100%; height: 100%;">
+                        <source src="${videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div id="video-error-msg" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); color: white; text-align: center; padding: 20px;">
+                        <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: #ff4444; margin-bottom: 15px;"></i>
+                        <h3 style="margin-bottom: 10px;">Unable to Stream Directly</h3>
+                        <p style="font-size: 14px; opacity: 0.8; max-width: 300px;">This file might be too large (>100MB) for direct streaming from Google Drive.</p>
+                        <a href="${url}" target="_blank" style="margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border-radius: 5px; text-decoration: none;">Open in Drive</a>
+                    </div>
+                </div>
             `;
+
+            // Add error listener to show the message if the stream fails (common for large Drive files)
+            const video = document.getElementById('native-video-player');
+            if (video) {
+                video.onerror = () => {
+                    document.getElementById('video-error-msg').classList.remove('hidden');
+                };
+            }
+            if (window.lucide) window.lucide.createIcons();
         } else {
             container.innerHTML = `<iframe src="${url}" allowfullscreen allow="autoplay; fullscreen" style="width: 100%; height: 100%; border: none;"></iframe>`;
         }

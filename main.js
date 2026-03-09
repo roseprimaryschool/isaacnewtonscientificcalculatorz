@@ -152,8 +152,9 @@ const auth = getAuth(app);
         const gamesView = document.getElementById('games-view');
         const authView = document.getElementById('auth-view');
         const videosView = document.getElementById('videos-view');
+        const shopView = document.getElementById('shop-view');
         
-        [calcView, gamesView, authView, videosView].forEach(v => {
+        [calcView, gamesView, authView, videosView, shopView].forEach(v => {
             if (v) {
                 v.style.display = 'none';
                 v.classList.remove('active');
@@ -169,6 +170,10 @@ const auth = getAuth(app);
         else if (view === 'videos') {
             target = videosView;
             loadVideos();
+        }
+        else if (view === 'shop') {
+            target = shopView;
+            loadShop();
         }
         else target = authView;
 
@@ -320,6 +325,11 @@ const auth = getAuth(app);
                     username: username,
                     totalHours: 0,
                     gameStats: {},
+                    coins: 100, // Starting bonus
+                    ownedThemes: ['default'],
+                    ownedTitles: [],
+                    activeTheme: 'default',
+                    activeTitle: '',
                     updatedAt: serverTimestamp()
                 });
             } else {
@@ -346,19 +356,25 @@ const auth = getAuth(app);
         const loginBtn = document.getElementById('btn-login-trigger');
         const profile = document.getElementById('user-profile');
         const nameDisplay = document.getElementById('display-username');
+        const coinDisplay = document.getElementById('user-coins');
 
         if (user) {
             if (loginBtn) loginBtn.classList.add('hidden');
             if (profile) profile.classList.remove('hidden');
+            
             // Fetch username from Firestore if not already in state
             if (currentUserData && currentUserData.username) {
                 if (nameDisplay) nameDisplay.innerText = currentUserData.username;
+                if (coinDisplay) coinDisplay.innerText = Math.floor(currentUserData.coins || 0);
+                applyTheme(currentUserData.activeTheme);
             } else {
                 getDoc(doc(db, 'users', user.uid)).then(snap => {
                     if (snap.exists()) {
                         const data = snap.data();
                         setCurrentUser({ ...data, uid: user.uid });
                         if (nameDisplay) nameDisplay.innerText = data.username;
+                        if (coinDisplay) coinDisplay.innerText = Math.floor(data.coins || 0);
+                        applyTheme(data.activeTheme);
                     }
                 });
             }
@@ -366,10 +382,156 @@ const auth = getAuth(app);
             if (loginBtn) loginBtn.classList.remove('hidden');
             if (profile) profile.classList.add('hidden');
             setCurrentUser(null);
+            applyTheme('default');
         }
     }
 
-    // --- Leaderboard Logic (Firestore) ---
+    // --- Shop Logic ---
+    const SHOP_ITEMS = {
+        themes: [
+            { id: 'default', title: 'Emerald (Default)', price: 0, desc: 'The classic Nova look.', preview: 'https://picsum.photos/seed/emerald/300/200' },
+            { id: 'cyberpunk', title: 'Cyberpunk', price: 500, desc: 'Neon lights and dark nights.', preview: 'https://picsum.photos/seed/cyberpunk/300/200' },
+            { id: 'retro', title: 'Retro Terminal', price: 300, desc: 'Classic green phosphor vibe.', preview: 'https://picsum.photos/seed/terminal/300/200' },
+            { id: 'stealth', title: 'Stealth Mode', price: 1000, desc: 'Looks like a boring document.', preview: 'https://picsum.photos/seed/office/300/200' }
+        ],
+        titles: [
+            { id: 'Novice', title: 'Novice', price: 100, desc: 'Just getting started.' },
+            { id: 'Pro', title: 'Pro Gamer', price: 500, desc: 'You know your way around.' },
+            { id: 'Legend', title: 'Legend', price: 2000, desc: 'A true Nova veteran.' },
+            { id: 'Nova-God', title: 'Nova God', price: 5000, desc: 'The ultimate rank.' }
+        ]
+    };
+
+    let currentShopTab = 'themes';
+
+    function loadShop() {
+        const grid = document.getElementById('shop-grid');
+        const coinDisplay = document.getElementById('shop-user-coins');
+        const user = getCurrentUser();
+        
+        if (!grid) return;
+        if (coinDisplay) coinDisplay.innerText = Math.floor(user?.coins || 0);
+
+        const items = SHOP_ITEMS[currentShopTab];
+        
+        grid.innerHTML = items.map(item => {
+            const isOwned = user && (currentShopTab === 'themes' ? 
+                user.ownedThemes?.includes(item.id) : 
+                user.ownedTitles?.includes(item.id));
+            
+            const isActive = user && (currentShopTab === 'themes' ? 
+                user.activeTheme === item.id : 
+                user.activeTitle === item.id);
+
+            let btnText = 'Buy';
+            let btnClass = 'can-buy';
+            
+            if (isActive) {
+                btnText = 'Active';
+                btnClass = 'active';
+            } else if (isOwned) {
+                btnText = 'Equip';
+                btnClass = 'can-buy';
+            } else if (user && user.coins < item.price) {
+                btnClass = 'owned'; // Disabled look
+            }
+
+            return `
+                <div class="shop-item">
+                    ${currentShopTab === 'themes' ? `
+                        <div class="item-preview">
+                            <img src="${item.preview}" alt="${item.title}">
+                        </div>
+                    ` : ''}
+                    <div class="item-info">
+                        <h3>${item.title}</h3>
+                        <p>${item.desc}</p>
+                    </div>
+                    <div class="item-footer">
+                        <div class="item-price">
+                            <i data-lucide="coins"></i>
+                            <span>${item.price}</span>
+                        </div>
+                        <button class="buy-btn ${btnClass}" onclick="handleShopAction('${currentShopTab}', '${item.id}', ${item.price})">
+                            ${btnText}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    window.handleShopAction = async (type, id, price) => {
+        const user = auth.currentUser;
+        if (!user) {
+            switchView('auth');
+            return;
+        }
+
+        const userData = getCurrentUser();
+        const isOwned = type === 'themes' ? 
+            userData.ownedThemes?.includes(id) : 
+            userData.ownedTitles?.includes(id);
+
+        if (isOwned) {
+            // Equip
+            try {
+                const userRef = doc(db, 'users', user.uid);
+                const updateData = {};
+                if (type === 'themes') {
+                    updateData.activeTheme = id;
+                    applyTheme(id);
+                } else {
+                    updateData.activeTitle = id;
+                }
+                await updateDoc(userRef, updateData);
+                setCurrentUser({ ...userData, ...updateData });
+                loadShop();
+            } catch (e) {
+                console.error('Equip failed:', e);
+            }
+            return;
+        }
+
+        // Purchase
+        if (userData.coins < price) return;
+
+        try {
+            const userRef = doc(db, 'users', user.uid);
+            const updateData = {
+                coins: userData.coins - price
+            };
+            
+            if (type === 'themes') {
+                updateData.ownedThemes = [...(userData.ownedThemes || []), id];
+                updateData.activeTheme = id;
+                applyTheme(id);
+            } else {
+                updateData.ownedTitles = [...(userData.ownedTitles || []), id];
+                updateData.activeTitle = id;
+            }
+
+            await updateDoc(userRef, updateData);
+            setCurrentUser({ ...userData, ...updateData });
+            
+            // Update UI
+            const coinDisplay = document.getElementById('user-coins');
+            if (coinDisplay) coinDisplay.innerText = Math.floor(updateData.coins);
+            
+            loadShop();
+        } catch (e) {
+            console.error('Purchase failed:', e);
+        }
+    };
+
+    function applyTheme(themeId) {
+        document.body.className = '';
+        if (themeId && themeId !== 'default') {
+            document.body.classList.add(`theme-${themeId}`);
+        }
+    }
     async function updatePlayTime() {
         if (!gameStartTime || !currentGameId) return;
         
@@ -379,6 +541,9 @@ const auth = getAuth(app);
         const endTime = Date.now();
         const durationMs = endTime - gameStartTime;
         const durationHours = durationMs / (1000 * 60 * 60);
+        
+        // Award coins: 10 coins per minute
+        const coinsEarned = (durationMs / (1000 * 60)) * 10;
 
         try {
             const userRef = doc(db, 'users', user.uid);
@@ -386,17 +551,24 @@ const auth = getAuth(app);
             if (snap.exists()) {
                 const data = snap.data();
                 const newTotal = (data.totalHours || 0) + durationHours;
+                const newCoins = (data.coins || 0) + coinsEarned;
                 const newGameStats = { ...(data.gameStats || {}) };
                 newGameStats[currentGameId] = (newGameStats[currentGameId] || 0) + durationHours;
                 
                 await updateDoc(userRef, {
                     totalHours: newTotal,
+                    coins: newCoins,
                     gameStats: newGameStats,
                     updatedAt: serverTimestamp()
                 });
                 
                 // Update local state
-                setCurrentUser({ ...data, totalHours: newTotal, gameStats: newGameStats, uid: user.uid });
+                const updatedData = { ...data, totalHours: newTotal, coins: newCoins, gameStats: newGameStats, uid: user.uid };
+                setCurrentUser(updatedData);
+                
+                // Update UI
+                const coinDisplay = document.getElementById('user-coins');
+                if (coinDisplay) coinDisplay.innerText = Math.floor(newCoins);
             }
         } catch (e) {
             console.error('Failed to update playtime:', e);
@@ -429,6 +601,7 @@ const auth = getAuth(app);
                 const data = doc.data();
                 return {
                     username: data.username,
+                    title: data.activeTitle || '',
                     score: gameId ? (data.gameStats[gameId] || 0) : (data.totalHours || 0)
                 };
             }).filter(u => u.score > 0.0001);
@@ -456,7 +629,10 @@ const auth = getAuth(app);
             return `
                 <div class="leaderboard-item ${isMe ? 'current-user' : ''}">
                     <span class="rank">${i + 1}</span>
-                    <span class="user-name">${u.username} ${isMe ? '(You)' : ''}</span>
+                    <span class="user-name">
+                        ${u.username} ${isMe ? '(You)' : ''}
+                        ${u.title ? `<span class="user-title">${u.title}</span>` : ''}
+                    </span>
                     <span class="play-time">${timeStr}</span>
                 </div>
             `;
@@ -592,8 +768,6 @@ const auth = getAuth(app);
         document.getElementById('btn-video-fs')?.addEventListener('click', () => toggleFullscreen('video-player-modal'));
         document.getElementById('btn-login-trigger')?.addEventListener('click', () => switchView('auth'));
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
-        document.getElementById('btn-nav-videos')?.addEventListener('click', () => switchView('videos'));
-        document.getElementById('btn-nav-games')?.addEventListener('click', () => switchView('games'));
         document.getElementById('btn-close-leaderboard')?.addEventListener('click', () => {
             document.getElementById('leaderboard-modal')?.classList.add('hidden');
         });
@@ -634,6 +808,15 @@ const auth = getAuth(app);
             // Username is now always required for both signup and login
             document.getElementById('username-group').style.display = 'block'; 
             document.getElementById('auth-submit-btn').innerText = authMode === 'signup' ? 'Sign Up' : 'Log In';
+        });
+
+        document.querySelectorAll('.shop-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentShopTab = tab.dataset.tab;
+                loadShop();
+            });
         });
 
         // Periodic update of playtime if game is open

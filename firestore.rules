@@ -19,18 +19,23 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['username', 'totalHours', 'gameStats', 'updatedAt']) &&
+      return data.keys().hasAll(['username', 'totalHours', 'gameStats', 'updatedAt', 'coins']) &&
              data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
              data.totalHours is number && data.totalHours >= 0 &&
-             data.gameStats is map;
+             data.coins is number && data.coins >= 0 &&
+             data.gameStats is map &&
+             (!('ownedThemes' in data) || data.ownedThemes is list) &&
+             (!('ownedTitles' in data) || data.ownedTitles is list) &&
+             (!('activeTheme' in data) || data.activeTheme is string) &&
+             (!('activeTitle' in data) || data.activeTitle is string);
     }
 
     // ===============================================================
     // User profiles
     // ===============================================================
     match /users/{userId} {
-      // Anyone authenticated can read user profiles (for leaderboard)
-      allow read: if isAuthenticated();
+      // Allow public read for leaderboard and profile viewing
+      allow read: if true;
       
       // Only the owner or admin can create/update profiles
       allow create: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);

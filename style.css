@@ -932,6 +932,224 @@ body.is-fullscreen .iframe-wrapper {
     max-width: 400px;
 }
 
+/* Shop & Coin Styles */
+.coin-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 215, 0, 0.1);
+    color: #ffd700;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.coin-display i {
+    width: 14px;
+    height: 14px;
+}
+
+.shop-trigger-btn {
+    background: rgba(255, 215, 0, 0.1);
+    color: #ffd700;
+    border: 1px solid #ffd700;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.shop-trigger-btn:hover {
+    background: #ffd700;
+    color: black;
+}
+
+.shop-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 24px;
+}
+
+.shop-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+}
+
+.shop-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.shop-tab.active {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+}
+
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 24px;
+}
+
+.shop-item {
+    background: #111;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: transform 0.3s;
+}
+
+.shop-item:hover {
+    transform: translateY(-5px);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.item-preview {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 12px;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+.item-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.item-info h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.item-info p {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+}
+
+.item-price {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    color: #ffd700;
+}
+
+.buy-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.buy-btn.owned {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-dim);
+    cursor: default;
+}
+
+.buy-btn.active {
+    background: var(--accent);
+    color: black;
+}
+
+.buy-btn.can-buy {
+    background: white;
+    color: black;
+}
+
+.buy-btn.can-buy:hover {
+    background: var(--accent);
+}
+
+/* User Titles in Leaderboard */
+.user-title {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-dim);
+}
+
+/* Themes */
+body.theme-cyberpunk {
+    --bg-dark: #050505;
+    --bg-card: #0d0221;
+    --accent: #ff00ff;
+    --text-main: #00ffff;
+    --border: rgba(0, 255, 255, 0.2);
+}
+
+body.theme-cyberpunk .btn.op { color: #ff00ff; }
+body.theme-cyberpunk .icon-box { background-color: #ff00ff; }
+
+body.theme-retro {
+    --bg-dark: #000;
+    --bg-card: #001100;
+    --accent: #00ff00;
+    --text-main: #00ff00;
+    --border: rgba(0, 255, 0, 0.3);
+}
+
+body.theme-retro * {
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+body.theme-stealth {
+    --bg-dark: #f3f4f6;
+    --bg-card: #ffffff;
+    --accent: #2563eb;
+    --text-main: #1f2937;
+    --text-dim: #6b7280;
+    --border: #e5e7eb;
+}
+
+body.theme-stealth .btn { background: #f9fafb; color: #1f2937; border: 1px solid #e5e7eb; }
+body.theme-stealth .calc-display { background: #ffffff; }
+body.theme-stealth .main-display { color: #111827; }
+body.theme-stealth .logo h1 { color: #111827; }
+body.theme-stealth .game-card { background: #ffffff; }
+
 @media (max-width: 600px) {
     .video-hero {
         padding: 24px;

@@ -17,13 +17,35 @@
           "type": "object",
           "description": "Map of gameId to hours played"
         },
+        "coins": {
+          "type": "number",
+          "description": "The user's Nova Coins balance"
+        },
+        "ownedThemes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of theme IDs owned by the user"
+        },
+        "ownedTitles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of title IDs owned by the user"
+        },
+        "activeTheme": {
+          "type": "string",
+          "description": "The current active theme ID"
+        },
+        "activeTitle": {
+          "type": "string",
+          "description": "The current active title ID"
+        },
         "updatedAt": {
           "type": "string",
           "format": "date-time",
           "description": "Last time the user's stats were updated"
         }
       },
-      "required": ["username", "totalHours"]
+      "required": ["username", "totalHours", "coins"]
     }
   },
   "firestore": {

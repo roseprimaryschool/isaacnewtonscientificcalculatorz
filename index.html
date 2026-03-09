@@ -107,10 +107,15 @@
                     </div>
                     <div class="header-right">
                         <nav class="main-nav">
-                            <button id="btn-nav-games" class="nav-btn active"><i data-lucide="gamepad-2"></i> Games</button>
-                            <button id="btn-nav-videos" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
+                            <button onclick="switchView('games')" class="nav-btn active"><i data-lucide="gamepad-2"></i> Games</button>
+                            <button onclick="switchView('videos')" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
+                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <div id="user-profile" class="user-profile hidden">
+                            <div class="coin-display">
+                                <i data-lucide="coins"></i>
+                                <span id="user-coins">0</span>
+                            </div>
                             <div class="user-info">
                                 <span id="display-username" class="username">Guest</span>
                                 <span class="status">Online</span>
@@ -177,6 +182,7 @@
                         <nav class="main-nav">
                             <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
                             <button class="nav-btn active"><i data-lucide="play-circle"></i> Videos</button>
+                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <button id="btn-exit-portal-videos" onclick="switchView('calculator')" class="exit-btn">
                             <i data-lucide="arrow-left"></i> EXIT PORTAL
@@ -202,6 +208,49 @@
                     <div class="stats">
                         <span><i data-lucide="eye"></i> 5.4M MONTHLY VIEWS</span>
                         <span><i data-lucide="video"></i> 12K VIDEOS</span>
+                    </div>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Shop View -->
+        <div id="shop-view" class="view">
+            <div class="shop-container">
+                <header class="games-header">
+                    <div class="logo">
+                        <div class="icon-box"><i data-lucide="shopping-cart"></i></div>
+                        <h1>NOVA SHOP</h1>
+                    </div>
+                    <div class="header-right">
+                        <div class="coin-display shop-coins">
+                            <i data-lucide="coins"></i>
+                            <span id="shop-user-coins">0</span>
+                        </div>
+                        <nav class="main-nav">
+                            <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
+                            <button onclick="switchView('videos')" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
+                            <button class="nav-btn active"><i data-lucide="shopping-cart"></i> Shop</button>
+                        </nav>
+                        <button onclick="switchView('calculator')" class="exit-btn">
+                            <i data-lucide="arrow-left"></i> EXIT PORTAL
+                        </button>
+                    </div>
+                </header>
+
+                <div class="shop-tabs">
+                    <button class="shop-tab active" data-tab="themes">Themes</button>
+                    <button class="shop-tab" data-tab="titles">Titles</button>
+                </div>
+
+                <div id="shop-grid" class="shop-grid">
+                    <!-- Shop items will be loaded here -->
+                </div>
+
+                <footer class="games-footer">
+                    <div>© 2026 NOVA COMMERCE</div>
+                    <div class="stats">
+                        <span><i data-lucide="shopping-bag"></i> 24 ITEMS AVAILABLE</span>
+                        <span><i data-lucide="refresh-cw"></i> UPDATES WEEKLY</span>
                     </div>
                 </footer>
             </div>

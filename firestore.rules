@@ -1,7 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -10,22 +12,32 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "c0sm1c404044@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['username', 'totalHours', 'gameStats', 'updatedAt']) &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
+             data.totalHours is number && data.totalHours >= 0 &&
+             data.gameStats is map;
+    }
+
+    // ===============================================================
     // User profiles
+    // ===============================================================
     match /users/{userId} {
       // Anyone authenticated can read user profiles (for leaderboard)
-      // But we should be careful if they contain PII. 
-      // Our blueprint says: username, totalHours, gameStats, updatedAt.
-      // No PII here.
       allow read: if isAuthenticated();
       
-      // Only the owner can create/update their own profile
-      allow create: if isOwner(userId) && 
-                      request.resource.data.username is string &&
-                      request.resource.data.totalHours is number;
+      // Only the owner or admin can create/update profiles
+      allow create: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
                       
-      allow update: if isOwner(userId) && 
-                      request.resource.data.username == resource.data.username && // Username immutable
-                      request.resource.data.totalHours is number;
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                      isValidUser(request.resource.data) &&
+                      request.resource.data.username == resource.data.username; // Username immutable
     }
   }
 }

@@ -11,7 +11,12 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
-export * from 'firebase/auth';
-export * from 'firebase/firestore';
+// Re-export common functions without conflict
+export { 
+    signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut 
+} from 'firebase/auth';
+export { 
+    doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp 
+} from 'firebase/firestore';
 
 export default app;

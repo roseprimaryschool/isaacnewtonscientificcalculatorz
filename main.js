@@ -266,7 +266,7 @@ const auth = getAuth(app);
             
             container.innerHTML = `
                 <div class="native-video-wrapper" style="width: 100%; height: 100%; position: relative; background: black;">
-                    <video id="native-video-player" playsinline crossorigin controls style="width: 100%; height: 100%;">
+                    <video id="native-video-player" playsinline controls style="width: 100%; height: 100%;">
                         <source src="${videoUrl}" type="video/mp4" size="1080">
                         <source src="${videoUrl}" type="video/mp4" size="720">
                         <source src="${videoUrl}" type="video/mp4" size="480">
@@ -274,7 +274,7 @@ const auth = getAuth(app);
                     <div id="video-error-msg" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); color: white; text-align: center; padding: 20px; z-index: 100;">
                         <i data-lucide="alert-triangle" style="width: 48px; height: 48px; color: #ff4444; margin-bottom: 15px;"></i>
                         <h3 style="margin-bottom: 10px;">Unable to Stream Directly</h3>
-                        <p style="font-size: 14px; opacity: 0.8; max-width: 300px;">This file might be too large (>100MB) for direct streaming from Google Drive.</p>
+                        <p style="font-size: 14px; opacity: 0.8; max-width: 300px;">This file might be too large (>100MB) for direct streaming from Google Drive or blocked by CORS.</p>
                         <a href="${url}" target="_blank" style="margin-top: 20px; padding: 10px 20px; background: #2563eb; color: white; border-radius: 5px; text-decoration: none;">Open in Drive</a>
                     </div>
                 </div>

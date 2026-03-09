@@ -235,12 +235,24 @@ const auth = getAuth(app);
 
         if (titleEl) titleEl.innerText = title;
         
+        // Handle Google Drive links specifically
+        // We use the /preview link in an iframe because direct download links 
+        // fail for files > 100MB due to Google's virus scan warning page.
+        if (url.includes('drive.google.com')) {
+            const driveId = url.match(/\/d\/([^/]+)/)?.[1];
+            if (driveId) {
+                const previewUrl = `https://drive.google.com/file/d/${driveId}/preview`;
+                container.innerHTML = `<iframe src="${previewUrl}" allowfullscreen allow="autoplay; fullscreen" style="width: 100%; height: 100%; border: none;"></iframe>`;
+                modal.classList.remove('hidden');
+                return;
+            }
+        }
+
         // Detect if it's a direct video file or from a known direct-link host
         const isDirectVideo = url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
                              url.includes('discordapp.com') || 
                              url.includes('github.com') ||
-                             url.includes('dropbox.com') ||
-                             url.includes('drive.google.com');
+                             url.includes('dropbox.com');
         
         if (isDirectVideo) {
             let videoUrl = url;
@@ -248,14 +260,6 @@ const auth = getAuth(app);
             // Handle Dropbox links (replace dl=0 with dl=1 for direct access)
             if (url.includes('dropbox.com')) {
                 videoUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
-            }
-            
-            // Handle Google Drive links
-            if (url.includes('drive.google.com')) {
-                const driveId = url.match(/\/d\/([^/]+)/)?.[1];
-                if (driveId) {
-                    videoUrl = `https://drive.google.com/uc?export=download&id=${driveId}`;
-                }
             }
             
             container.innerHTML = `

@@ -192,7 +192,7 @@ const auth = getAuth(app);
                 thumbnail: "https://img.youtube.com/vi/0e3GPea1Tyg/maxresdefault.jpg", 
                 duration: "18:40", 
                 views: "200M",
-                url: "https://www.youtube-nocookie.com/embed/0e3GPea1Tyg"
+                url: "https://drive.google.com/file/d/1zHVlLaYLgfLbb0iCmyQQaM-iRbXQSniL/view?usp=sharing"
             }
         ];
 
@@ -239,11 +239,24 @@ const auth = getAuth(app);
         const isDirectVideo = url.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/i) || 
                              url.includes('discordapp.com') || 
                              url.includes('github.com') ||
-                             url.includes('dropbox.com');
+                             url.includes('dropbox.com') ||
+                             url.includes('drive.google.com');
         
         if (isDirectVideo) {
+            let videoUrl = url;
+            
             // Handle Dropbox links (replace dl=0 with dl=1 for direct access)
-            const videoUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+            if (url.includes('dropbox.com')) {
+                videoUrl = url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+            }
+            
+            // Handle Google Drive links
+            if (url.includes('drive.google.com')) {
+                const driveId = url.match(/\/d\/([^/]+)/)?.[1];
+                if (driveId) {
+                    videoUrl = `https://drive.google.com/uc?export=download&id=${driveId}`;
+                }
+            }
             
             container.innerHTML = `
                 <video id="native-video-player" controls playsinline class="native-video" style="width: 100%; height: 100%; background: black;">

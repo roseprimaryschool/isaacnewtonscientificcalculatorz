@@ -109,7 +109,8 @@
                         <nav class="main-nav">
                             <button onclick="switchView('games')" class="nav-btn active"><i data-lucide="gamepad-2"></i> Games</button>
                             <button onclick="switchView('videos')" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
-                            <button id="btn-open-shop" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
+                            <button onclick="switchView('chat')" class="nav-btn"><i data-lucide="message-square"></i> Chat</button>
+                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <div id="user-profile" class="user-profile hidden">
                             <div id="user-avatar-container" class="user-avatar-container">
@@ -191,7 +192,8 @@
                         <nav class="main-nav">
                             <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
                             <button onclick="switchView('videos')" class="nav-btn active"><i data-lucide="play-circle"></i> Videos</button>
-                            <button id="btn-open-shop-videos" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
+                            <button onclick="switchView('chat')" class="nav-btn"><i data-lucide="message-square"></i> Chat</button>
+                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <button id="btn-exit-portal-videos" onclick="switchView('calculator')" class="exit-btn">
                             <i data-lucide="arrow-left"></i> EXIT PORTAL
@@ -244,7 +246,8 @@
                         <nav class="main-nav">
                             <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
                             <button onclick="switchView('videos')" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
-                            <button class="nav-btn active"><i data-lucide="shopping-cart"></i> Shop</button>
+                            <button onclick="switchView('chat')" class="nav-btn"><i data-lucide="message-square"></i> Chat</button>
+                            <button onclick="switchView('shop')" class="nav-btn active"><i data-lucide="shopping-cart"></i> Shop</button>
                         </nav>
                         <button onclick="switchView('calculator')" class="exit-btn">
                             <i data-lucide="arrow-left"></i> EXIT PORTAL
@@ -267,6 +270,71 @@
                     <div class="stats">
                         <span><i data-lucide="shopping-bag"></i> 24 ITEMS AVAILABLE</span>
                         <span><i data-lucide="refresh-cw"></i> UPDATES WEEKLY</span>
+                    </div>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Chat View -->
+        <div id="chat-view" class="view">
+            <div class="chat-view-container">
+                <header class="games-header">
+                    <div class="logo">
+                        <div class="icon-box"><i data-lucide="message-square"></i></div>
+                        <h1>NOVA CHAT</h1>
+                    </div>
+                    <div class="header-right">
+                        <nav class="main-nav">
+                            <button onclick="switchView('games')" class="nav-btn"><i data-lucide="gamepad-2"></i> Games</button>
+                            <button onclick="switchView('videos')" class="nav-btn"><i data-lucide="play-circle"></i> Videos</button>
+                            <button onclick="switchView('chat')" class="nav-btn active"><i data-lucide="message-square"></i> Chat</button>
+                            <button onclick="switchView('shop')" class="nav-btn"><i data-lucide="shopping-cart"></i> Shop</button>
+                        </nav>
+                        <button onclick="switchView('calculator')" class="exit-btn">
+                            <i data-lucide="arrow-left"></i> EXIT PORTAL
+                        </button>
+                    </div>
+                </header>
+
+                <div class="chat-layout">
+                    <div class="chat-sidebar">
+                        <div class="sidebar-header">
+                            <h3>Conversations</h3>
+                        </div>
+                        <div class="friend-search">
+                            <input type="text" id="friend-search-input" placeholder="Search username...">
+                            <button id="btn-search-friend"><i data-lucide="search"></i></button>
+                        </div>
+                        <div id="conversations-list" class="conversations-list">
+                            <div class="conv-item active" data-type="global">
+                                <i data-lucide="globe"></i>
+                                <span>Global Chat</span>
+                            </div>
+                            <!-- Private conversations will appear here -->
+                        </div>
+                    </div>
+
+                    <div class="chat-main">
+                        <div class="chat-main-header">
+                            <h2 id="current-chat-title">Global Chat</h2>
+                        </div>
+                        <div id="chat-view-messages" class="chat-messages">
+                            <!-- Messages will be loaded here -->
+                        </div>
+                        <form id="chat-view-form" class="chat-input-area">
+                            <input type="text" id="chat-view-input" placeholder="Type a message..." maxlength="500" autocomplete="off">
+                            <button type="submit" class="chat-send-btn">
+                                <i data-lucide="send"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <footer class="games-footer">
+                    <div>© 2026 NOVA NETWORK</div>
+                    <div class="stats">
+                        <span><i data-lucide="message-circle"></i> REAL-TIME COMMUNICATION</span>
+                        <span><i data-lucide="shield"></i> ENCRYPTED CHATS</span>
                     </div>
                 </footer>
             </div>
@@ -303,38 +371,6 @@
             </div>
         </div>
 
-        <!-- Global Chat -->
-        <div id="chat-widget" class="chat-widget hidden">
-            <button id="btn-toggle-chat" class="chat-toggle-btn">
-                <i data-lucide="message-square"></i>
-                <span class="chat-badge hidden" id="chat-unread-count">0</span>
-            </button>
-            
-            <div id="chat-window" class="chat-window hidden">
-                <div class="chat-header">
-                    <div class="chat-title">
-                        <i data-lucide="message-circle"></i>
-                        <span>Global Chat</span>
-                    </div>
-                    <button id="btn-close-chat-window" class="chat-close-btn">
-                        <i data-lucide="minimize-2"></i>
-                    </button>
-                </div>
-                
-                <div id="chat-messages" class="chat-messages">
-                    <div class="chat-welcome">
-                        <p>Welcome to Nova Global Chat! Be respectful and have fun.</p>
-                    </div>
-                </div>
-                
-                <form id="chat-form" class="chat-input-area">
-                    <input type="text" id="chat-input" placeholder="Type a message..." maxlength="500" autocomplete="off">
-                    <button type="submit" id="btn-send-chat" class="chat-send-btn">
-                        <i data-lucide="send"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
     </div>
 
     <script src="https://unpkg.com/mathjs@11.8.0/lib/browser/math.js"></script>

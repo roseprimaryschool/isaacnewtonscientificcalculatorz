@@ -60,6 +60,24 @@
         "activeAvatar": { "type": "string" }
       },
       "required": ["userId", "username", "text", "timestamp"]
+    },
+    "PrivateMessage": {
+      "title": "PrivateMessage",
+      "description": "A message in a private chat between two users",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of the two user UIDs involved"
+        }
+      },
+      "required": ["senderId", "senderName", "receiverId", "text", "timestamp", "participants"]
     }
   },
   "firestore": {
@@ -70,6 +88,10 @@
     "/messages/{messageId}": {
       "schema": "ChatMessage",
       "description": "Global chat messages"
+    },
+    "/private_messages/{messageId}": {
+      "schema": "PrivateMessage",
+      "description": "Private messages between users"
     }
   }
 }

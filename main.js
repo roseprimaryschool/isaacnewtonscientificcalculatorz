@@ -4,7 +4,7 @@ import {
     getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { 
-    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, onSnapshot, addDoc 
+    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, onSnapshot, addDoc, where 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -153,8 +153,9 @@ const auth = getAuth(app);
         const authView = document.getElementById('auth-view');
         const videosView = document.getElementById('videos-view');
         const shopView = document.getElementById('nova-shop-view');
+        const chatView = document.getElementById('chat-view');
         
-        [calcView, gamesView, authView, videosView, shopView].forEach(v => {
+        [calcView, gamesView, authView, videosView, shopView, chatView].forEach(v => {
             if (v) {
                 v.style.display = 'none';
                 v.classList.remove('active');
@@ -175,6 +176,9 @@ const auth = getAuth(app);
             case 'shop': 
                 target = shopView; 
                 loadShop(); 
+                break;
+            case 'chat':
+                target = chatView;
                 break;
             case 'auth': target = authView; break;
             default: target = authView;
@@ -812,36 +816,17 @@ const auth = getAuth(app);
 
     // --- Global Chat Logic ---
     let chatUnsubscribe = null;
-    let isChatOpen = false;
-    let unreadCount = 0;
+    let currentChatId = 'global'; // 'global' or 'uid1_uid2'
+    let activePrivateChatUser = null;
 
     function initChat() {
-        const chatWidget = document.getElementById('chat-widget');
-        const chatToggleBtn = document.getElementById('btn-toggle-chat');
-        const chatCloseBtn = document.getElementById('btn-close-chat-window');
-        const chatWindow = document.getElementById('chat-window');
-        const chatForm = document.getElementById('chat-form');
-        const chatInput = document.getElementById('chat-input');
-        const chatMessages = document.getElementById('chat-messages');
-        const unreadBadge = document.getElementById('chat-unread-count');
+        const chatForm = document.getElementById('chat-view-form');
+        const chatInput = document.getElementById('chat-view-input');
+        const friendSearchInput = document.getElementById('friend-search-input');
+        const friendSearchBtn = document.getElementById('btn-search-friend');
+        const conversationsList = document.getElementById('conversations-list');
 
-        if (!chatWidget || !chatToggleBtn || !chatCloseBtn || !chatWindow || !chatForm || !chatInput || !chatMessages) return;
-
-        chatToggleBtn.addEventListener('click', () => {
-            isChatOpen = !isChatOpen;
-            chatWindow.classList.toggle('hidden', !isChatOpen);
-            if (isChatOpen) {
-                unreadCount = 0;
-                unreadBadge.classList.add('hidden');
-                scrollToBottom();
-                chatInput.focus();
-            }
-        });
-
-        chatCloseBtn.addEventListener('click', () => {
-            isChatOpen = false;
-            chatWindow.classList.add('hidden');
-        });
+        if (!chatForm || !chatInput || !friendSearchInput || !friendSearchBtn || !conversationsList) return;
 
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -852,43 +837,163 @@ const auth = getAuth(app);
             if (!text || !user || !userData) return;
 
             try {
-                await addDoc(collection(db, 'messages'), {
-                    userId: user.uid,
-                    username: userData.username,
-                    text: text,
-                    timestamp: serverTimestamp(),
-                    activeTitle: userData.activeTitle || '',
-                    activeAvatar: userData.activeAvatar || ''
-                });
+                if (currentChatId === 'global') {
+                    await addDoc(collection(db, 'messages'), {
+                        userId: user.uid,
+                        username: userData.username,
+                        text: text,
+                        timestamp: serverTimestamp(),
+                        activeTitle: userData.activeTitle || '',
+                        activeAvatar: userData.activeAvatar || ''
+                    });
+                } else {
+                    // Private Message
+                    const participants = [user.uid, activePrivateChatUser.uid].sort();
+                    await addDoc(collection(db, 'private_messages'), {
+                        senderId: user.uid,
+                        receiverId: activePrivateChatUser.uid,
+                        text: text,
+                        timestamp: serverTimestamp(),
+                        participants: participants,
+                        senderUsername: userData.username,
+                        receiverUsername: activePrivateChatUser.username
+                    });
+                }
                 chatInput.value = '';
             } catch (err) {
                 console.error('Failed to send message:', err);
             }
         });
 
-        // Listen for messages
-        const q = query(collection(db, 'messages'), orderBy('timestamp', 'desc'), limit(50));
-        chatUnsubscribe = onSnapshot(q, (snapshot) => {
-            const messages = [];
-            snapshot.forEach(doc => {
-                messages.push({ id: doc.id, ...doc.data() });
-            });
-            renderMessages(messages.reverse());
-            
-            if (!isChatOpen && !snapshot.metadata.hasPendingWrites) {
-                unreadCount += snapshot.docChanges().filter(change => change.type === 'added').length;
-                if (unreadCount > 0) {
-                    unreadBadge.innerText = unreadCount > 99 ? '99+' : unreadCount;
-                    unreadBadge.classList.remove('hidden');
+        friendSearchBtn.addEventListener('click', async () => {
+            const username = friendSearchInput.value.trim();
+            if (!username) return;
+
+            try {
+                const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
+                const snapshot = await getDocs(q);
+                if (snapshot.empty) {
+                    alert('User not found');
+                    return;
                 }
+
+                const friendData = { uid: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+                if (friendData.uid === auth.currentUser.uid) {
+                    alert("You can't chat with yourself!");
+                    return;
+                }
+
+                startPrivateChat(friendData);
+                friendSearchInput.value = '';
+            } catch (err) {
+                console.error('Search failed:', err);
             }
         });
+
+        // Initialize with global chat
+        loadConversation('global');
     }
 
+    function startPrivateChat(user) {
+        activePrivateChatUser = user;
+        const myUid = auth.currentUser.uid;
+        const participants = [myUid, user.uid].sort();
+        currentChatId = participants.join('_');
+        
+        // Update UI
+        const titleEl = document.getElementById('current-chat-title');
+        if (titleEl) titleEl.innerText = `Chat with ${user.username}`;
+        
+        // Update Sidebar
+        updateConversationsList(user);
+        
+        loadConversation(currentChatId);
+    }
+
+    function updateConversationsList(newFriend = null) {
+        const list = document.getElementById('conversations-list');
+        if (!list) return;
+
+        // For now, we'll just show Global and the active private chat
+        // In a real app, we'd fetch recent conversations from Firestore
+        let html = `
+            <div class="conv-item ${currentChatId === 'global' ? 'active' : ''}" onclick="window.loadConversation('global')">
+                <i data-lucide="globe" size="18"></i>
+                <span>Global Chat</span>
+            </div>
+        `;
+
+        if (activePrivateChatUser) {
+            html += `
+                <div class="conv-item ${currentChatId !== 'global' ? 'active' : ''}" onclick="window.loadConversation('${currentChatId}')">
+                    <i data-lucide="user" size="18"></i>
+                    <span>${activePrivateChatUser.username}</span>
+                </div>
+            `;
+        }
+
+        list.innerHTML = html;
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    window.loadConversation = function(id) {
+        if (chatUnsubscribe) {
+            chatUnsubscribe();
+            chatUnsubscribe = null;
+        }
+
+        currentChatId = id;
+        const chatMessages = document.getElementById('chat-view-messages');
+        if (chatMessages) chatMessages.innerHTML = '<div class="chat-welcome">Loading messages...</div>';
+
+        if (id === 'global') {
+            activePrivateChatUser = null;
+            const titleEl = document.getElementById('current-chat-title');
+            if (titleEl) titleEl.innerText = 'Global Chat';
+            const q = query(collection(db, 'messages'), orderBy('timestamp', 'desc'), limit(50));
+            chatUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messages = [];
+                snapshot.forEach(doc => {
+                    messages.push({ id: doc.id, ...doc.data() });
+                });
+                renderMessages(messages.reverse());
+            });
+        } else {
+            // Private Chat
+            const participants = id.split('_');
+            const q = query(
+                collection(db, 'private_messages'), 
+                where('participants', '==', participants),
+                orderBy('timestamp', 'desc'), 
+                limit(50)
+            );
+            chatUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messages = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    messages.push({ 
+                        id: doc.id, 
+                        userId: data.senderId,
+                        username: data.senderUsername,
+                        text: data.text,
+                        timestamp: data.timestamp
+                    });
+                });
+                renderMessages(messages.reverse());
+            });
+        }
+        updateConversationsList();
+    };
+
     function renderMessages(messages) {
-        const chatMessages = document.getElementById('chat-messages');
+        const chatMessages = document.getElementById('chat-view-messages');
         const user = auth.currentUser;
         if (!chatMessages) return;
+
+        if (messages.length === 0) {
+            chatMessages.innerHTML = '<div class="chat-welcome">No messages yet. Say hi!</div>';
+            return;
+        }
 
         const html = messages.map(msg => {
             const isOwn = user && msg.userId === user.uid;
@@ -911,7 +1016,7 @@ const auth = getAuth(app);
     }
 
     function scrollToBottom() {
-        const chatMessages = document.getElementById('chat-messages');
+        const chatMessages = document.getElementById('chat-view-messages');
         if (chatMessages) {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -963,6 +1068,7 @@ const auth = getAuth(app);
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
         document.getElementById('btn-open-shop')?.addEventListener('click', () => switchView('shop'));
         document.getElementById('btn-open-shop-videos')?.addEventListener('click', () => switchView('shop'));
+        document.getElementById('btn-open-chat')?.addEventListener('click', () => switchView('chat'));
         document.getElementById('btn-close-leaderboard')?.addEventListener('click', () => {
             document.getElementById('leaderboard-modal')?.classList.add('hidden');
         });
@@ -1022,12 +1128,9 @@ const auth = getAuth(app);
         // Firebase Auth Listener
         onAuthStateChanged(auth, (user) => {
             updateAuthUI(user);
-            const chatWidget = document.getElementById('chat-widget');
             if (user) {
-                chatWidget?.classList.remove('hidden');
                 if (!chatUnsubscribe) initChat();
             } else {
-                chatWidget?.classList.add('hidden');
                 if (chatUnsubscribe) {
                     chatUnsubscribe();
                     chatUnsubscribe = null;

@@ -492,9 +492,16 @@ const auth = getAuth(app);
                             </svg>
                             <span>${item.price}</span>
                         </div>
-                        <button class="buy-btn ${btnClass}" onclick="handleShopAction('${currentShopTab}', '${item.id}', ${item.price})">
-                            ${btnText}
-                        </button>
+                        <div class="item-actions">
+                            ${currentShopTab === 'themes' ? `
+                                <button class="preview-btn" onclick="previewTheme('${item.id}')">
+                                    Preview
+                                </button>
+                            ` : ''}
+                            <button class="buy-btn ${btnClass}" onclick="handleShopAction('${currentShopTab}', '${item.id}', ${item.price})">
+                                ${btnText}
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -578,6 +585,25 @@ const auth = getAuth(app);
         } catch (e) {
             console.error('Purchase failed:', e);
         }
+    };
+
+    let previewTimeout = null;
+    let originalTheme = null;
+
+    window.previewTheme = (themeId) => {
+        if (previewTimeout) {
+            clearTimeout(previewTimeout);
+        } else {
+            originalTheme = getCurrentUser()?.activeTheme || 'default';
+        }
+
+        applyTheme(themeId);
+
+        previewTimeout = setTimeout(() => {
+            applyTheme(originalTheme);
+            previewTimeout = null;
+            originalTheme = null;
+        }, 3000);
     };
 
     function applyTheme(themeId) {

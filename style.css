@@ -1106,6 +1106,29 @@ body.is-fullscreen .iframe-wrapper {
     margin-top: auto;
 }
 
+.item-actions {
+    display: flex;
+    align-items: center;
+}
+
+.preview-btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    margin-right: 8px;
+}
+
+.preview-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: white;
+}
+
 .item-price {
     display: flex;
     align-items: center;

@@ -3,11 +3,69 @@ import { createServer as createViteServer } from "vite";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import admin from "firebase-admin";
+import cron from "node-cron";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DB_FILE = path.join(__dirname, "db.json");
+const CONFIG_FILE = path.join(__dirname, "firebase-applet-config.json");
+
+let firebaseAdmin: admin.app.App | null = null;
+let firestore: admin.firestore.Firestore | null = null;
+
+async function initFirebase() {
+    try {
+        const configData = await fs.readFile(CONFIG_FILE, "utf-8");
+        const config = JSON.parse(configData);
+        
+        firebaseAdmin = admin.initializeApp({
+            projectId: config.projectId,
+        }, "server-admin");
+        
+        firestore = firebaseAdmin.firestore();
+        console.log("Firebase Admin initialized successfully");
+        
+        // Schedule weekly cleanup: Every Sunday at 00:00
+        cron.schedule("0 0 * * 0", async () => {
+            console.log("Running weekly chat cleanup...");
+            await cleanupChatMessages();
+        });
+        
+    } catch (error) {
+        console.error("Failed to initialize Firebase Admin:", error);
+    }
+}
+
+async function cleanupChatMessages(daysToKeep = 7) {
+    if (!firestore) return;
+    
+    try {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - daysToKeep);
+        
+        console.log(`Cleaning up messages older than ${cutoff.toISOString()}`);
+        
+        const messagesRef = firestore.collection("messages");
+        const snapshot = await messagesRef.where("timestamp", "<", cutoff).get();
+        
+        if (snapshot.empty) {
+            console.log("No old messages to delete.");
+            return;
+        }
+        
+        const batch = firestore.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+        console.log(`Successfully deleted ${snapshot.size} old messages.`);
+    } catch (error) {
+        console.error("Error during chat cleanup:", error);
+    }
+}
 
 async function initDB() {
     try {
@@ -28,12 +86,21 @@ async function saveDB(db: any) {
 
 async function startServer() {
     await initDB();
+    await initFirebase();
+    
     const app = express();
     const PORT = 3000;
 
     app.use(express.json());
 
     // --- API Routes ---
+
+    // Manual Cleanup Trigger (for testing/admin)
+    app.post("/api/admin/cleanup", async (req, res) => {
+        // In a real app, you'd check for admin permissions here
+        await cleanupChatMessages();
+        res.json({ status: "Cleanup triggered" });
+    });
 
     // Signup
     app.post("/api/auth/signup", async (req, res) => {

@@ -455,7 +455,13 @@ const auth = getAuth(app);
                     </div>
                     <div class="item-footer">
                         <div class="item-price">
-                            <i data-lucide="coins"></i>
+                            <svg class="nova-coin" viewBox="0 0 32 32" width="16" height="16">
+                                <path d="M4 4h24v24H4z" fill="#f59e0b" />
+                                <path d="M6 6h20v20H6z" fill="#fbbf24" />
+                                <path d="M8 8h16v16H8z" fill="#fcd34d" />
+                                <path d="M10 10h2v12h-2zM20 10h2v12h-2zM12 10h8v2h-8zM12 20h8v2h-8z" fill="#b45309" opacity="0.3" />
+                                <path d="M11 11h2v10h-2zM19 11h2v10h-2zM13 11h6v2h-6zM13 15h6v2h-6z" fill="#92400e" />
+                            </svg>
                             <span>${item.price}</span>
                         </div>
                         <button class="buy-btn ${btnClass}" onclick="handleShopAction('${currentShopTab}', '${item.id}', ${item.price})">

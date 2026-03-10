@@ -936,14 +936,19 @@ body.is-fullscreen .iframe-wrapper {
 .coin-display {
     display: flex;
     align-items: center;
-    gap: 6px;
-    background: rgba(255, 215, 0, 0.1);
-    color: #ffd700;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fbbf24;
     padding: 4px 12px;
     border-radius: 100px;
     font-size: 13px;
     font-weight: 700;
-    border: 1px solid rgba(255, 215, 0, 0.2);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.nova-coin {
+    image-rendering: pixelated;
+    filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.4));
 }
 
 .coin-display i {

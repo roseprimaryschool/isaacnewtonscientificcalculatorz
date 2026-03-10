@@ -39,13 +39,15 @@ service cloud.firestore {
              (!('activeAvatar' in data) || data.activeAvatar is string);
     }
 
+    function isValidChatRoom(data) {
+      return data.keys().hasAll(['participants', 'updatedAt']) &&
+             data.participants is list && data.participants.size() == 2 &&
+             request.auth.uid in data.participants;
+    }
+
     function isValidPrivateMessage(data) {
-      return data.keys().hasAll(['senderId', 'senderName', 'receiverId', 'text', 'timestamp', 'participants']) &&
+      return data.keys().hasAll(['senderId', 'senderName', 'text', 'timestamp']) &&
              data.senderId == request.auth.uid &&
-             data.participants.size() == 2 &&
-             request.auth.uid in data.participants &&
-             data.receiverId in data.participants &&
-             data.senderName is string && data.senderName.size() > 0 && data.senderName.size() < 50 &&
              data.text is string && data.text.size() > 0 && data.text.size() < 1000;
     }
 
@@ -79,17 +81,17 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Private Chat
+    // Private Chat Rooms
     // ===============================================================
-    match /private_messages/{messageId} {
-      // Only participants can read their private messages
+    match /chatRooms/{roomId} {
       allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && isValidChatRoom(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
       
-      // Only authenticated users can send private messages to valid participants
-      allow create: if isAuthenticated() && isValidPrivateMessage(request.resource.data);
-      
-      // Only admins can delete private messages
-      allow delete: if isAdmin();
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;
+        allow create: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants && isValidPrivateMessage(request.resource.data);
+      }
     }
   }
 }

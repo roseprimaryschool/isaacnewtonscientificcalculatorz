@@ -4,7 +4,7 @@ import {
     getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { 
-    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, onSnapshot, addDoc, where 
+    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, orderBy, limit, serverTimestamp, onSnapshot, addDoc 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -178,7 +178,13 @@ const auth = getAuth(app);
                 loadShop(); 
                 break;
             case 'chat':
-                target = chatView;
+                target = document.getElementById('chat-view');
+                if (auth.currentUser) {
+                    loadChatRooms();
+                } else {
+                    switchView('auth');
+                    return;
+                }
                 break;
             case 'auth': target = authView; break;
             default: target = authView;
@@ -814,212 +820,244 @@ const auth = getAuth(app);
         if (iframe) iframe.src = '';
     }
 
-    // --- Global Chat Logic ---
-    let chatUnsubscribe = null;
-    let currentChatId = 'global'; // 'global' or 'uid1_uid2'
-    let activePrivateChatUser = null;
+    // --- Private Chat Logic ---
+    let chatRoomsUnsubscribe = null;
+    let activeChatUnsubscribe = null;
+    let activeRoomId = null;
 
-    function initChat() {
-        const chatForm = document.getElementById('chat-view-form');
-        const chatInput = document.getElementById('chat-view-input');
-        const friendSearchInput = document.getElementById('friend-search-input');
-        const friendSearchBtn = document.getElementById('btn-search-friend');
-        const conversationsList = document.getElementById('conversations-list');
+    function initPrivateChat() {
+        const addFriendBtn = document.getElementById('btn-add-friend');
+        const closeAddFriendBtn = document.getElementById('btn-close-add-friend');
+        const addFriendModal = document.getElementById('add-friend-modal');
+        const searchFriendBtn = document.getElementById('btn-search-friend');
+        const searchFriendInput = document.getElementById('search-friend-input');
+        const privateChatForm = document.getElementById('private-chat-form');
+        const privateChatInput = document.getElementById('private-chat-input');
 
-        if (!chatForm || !chatInput || !friendSearchInput || !friendSearchBtn || !conversationsList) return;
-
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const text = chatInput.value.trim();
-            const user = auth.currentUser;
-            const userData = getCurrentUser();
-
-            if (!text || !user || !userData) return;
-
-            try {
-                if (currentChatId === 'global') {
-                    await addDoc(collection(db, 'messages'), {
-                        userId: user.uid,
-                        username: userData.username,
-                        text: text,
-                        timestamp: serverTimestamp(),
-                        activeTitle: userData.activeTitle || '',
-                        activeAvatar: userData.activeAvatar || ''
-                    });
-                } else {
-                    // Private Message
-                    const participants = [user.uid, activePrivateChatUser.uid].sort();
-                    await addDoc(collection(db, 'private_messages'), {
-                        senderId: user.uid,
-                        receiverId: activePrivateChatUser.uid,
-                        text: text,
-                        timestamp: serverTimestamp(),
-                        participants: participants,
-                        senderUsername: userData.username,
-                        receiverUsername: activePrivateChatUser.username
-                    });
-                }
-                chatInput.value = '';
-            } catch (err) {
-                console.error('Failed to send message:', err);
-            }
-        });
-
-        friendSearchBtn.addEventListener('click', async () => {
-            const username = friendSearchInput.value.trim();
-            if (!username) return;
-
-            try {
-                const q = query(collection(db, 'users'), where('username', '==', username), limit(1));
-                const snapshot = await getDocs(q);
-                if (snapshot.empty) {
-                    alert('User not found');
-                    return;
-                }
-
-                const friendData = { uid: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-                if (friendData.uid === auth.currentUser.uid) {
-                    alert("You can't chat with yourself!");
-                    return;
-                }
-
-                startPrivateChat(friendData);
-                friendSearchInput.value = '';
-            } catch (err) {
-                console.error('Search failed:', err);
-            }
-        });
-
-        // Initialize with global chat
-        loadConversation('global');
-    }
-
-    function startPrivateChat(user) {
-        activePrivateChatUser = user;
-        const myUid = auth.currentUser.uid;
-        const participants = [myUid, user.uid].sort();
-        currentChatId = participants.join('_');
-        
-        // Update UI
-        const titleEl = document.getElementById('current-chat-title');
-        if (titleEl) titleEl.innerText = `Chat with ${user.username}`;
-        
-        // Update Sidebar
-        updateConversationsList(user);
-        
-        loadConversation(currentChatId);
-    }
-
-    function updateConversationsList(newFriend = null) {
-        const list = document.getElementById('conversations-list');
-        if (!list) return;
-
-        // For now, we'll just show Global and the active private chat
-        // In a real app, we'd fetch recent conversations from Firestore
-        let html = `
-            <div class="conv-item ${currentChatId === 'global' ? 'active' : ''}" onclick="window.loadConversation('global')">
-                <i data-lucide="globe" size="18"></i>
-                <span>Global Chat</span>
-            </div>
-        `;
-
-        if (activePrivateChatUser) {
-            html += `
-                <div class="conv-item ${currentChatId !== 'global' ? 'active' : ''}" onclick="window.loadConversation('${currentChatId}')">
-                    <i data-lucide="user" size="18"></i>
-                    <span>${activePrivateChatUser.username}</span>
-                </div>
-            `;
-        }
-
-        list.innerHTML = html;
-        if (window.lucide) window.lucide.createIcons();
-    }
-
-    window.loadConversation = function(id) {
-        if (chatUnsubscribe) {
-            chatUnsubscribe();
-            chatUnsubscribe = null;
-        }
-
-        currentChatId = id;
-        const chatMessages = document.getElementById('chat-view-messages');
-        if (chatMessages) chatMessages.innerHTML = '<div class="chat-welcome">Loading messages...</div>';
-
-        if (id === 'global') {
-            activePrivateChatUser = null;
-            const titleEl = document.getElementById('current-chat-title');
-            if (titleEl) titleEl.innerText = 'Global Chat';
-            const q = query(collection(db, 'messages'), orderBy('timestamp', 'desc'), limit(50));
-            chatUnsubscribe = onSnapshot(q, (snapshot) => {
-                const messages = [];
-                snapshot.forEach(doc => {
-                    messages.push({ id: doc.id, ...doc.data() });
-                });
-                renderMessages(messages.reverse());
-            });
-        } else {
-            // Private Chat
-            const participants = id.split('_');
-            const q = query(
-                collection(db, 'private_messages'), 
-                where('participants', '==', participants),
-                orderBy('timestamp', 'desc'), 
-                limit(50)
-            );
-            chatUnsubscribe = onSnapshot(q, (snapshot) => {
-                const messages = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    messages.push({ 
-                        id: doc.id, 
-                        userId: data.senderId,
-                        username: data.senderUsername,
-                        text: data.text,
-                        timestamp: data.timestamp
-                    });
-                });
-                renderMessages(messages.reverse());
+        if (addFriendBtn) {
+            addFriendBtn.addEventListener('click', () => {
+                addFriendModal.classList.remove('hidden');
+                searchFriendInput.focus();
             });
         }
-        updateConversationsList();
+
+        if (closeAddFriendBtn) {
+            closeAddFriendBtn.addEventListener('click', () => {
+                addFriendModal.classList.add('hidden');
+            });
+        }
+
+        if (searchFriendBtn) {
+            searchFriendBtn.addEventListener('click', searchFriends);
+        }
+
+        if (searchFriendInput) {
+            searchFriendInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') searchFriends();
+            });
+        }
+
+        if (privateChatForm) {
+            privateChatForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const text = privateChatInput.value.trim();
+                if (!text || !activeRoomId) return;
+                
+                try {
+                    await sendPrivateMessage(activeRoomId, text);
+                    privateChatInput.value = '';
+                } catch (err) {
+                    console.error('Failed to send private message:', err);
+                }
+            });
+        }
+    }
+
+    async function searchFriends() {
+        const input = document.getElementById('search-friend-input');
+        const results = document.getElementById('search-results');
+        if (!input || !results) return;
+
+        const username = input.value.trim();
+        if (!username) return;
+
+        results.innerHTML = '<div class="loading">Searching...</div>';
+
+        try {
+            const q = query(collection(db, 'users'), where('username', '==', username), limit(5));
+            const snap = await getDocs(q);
+            
+            if (snap.empty) {
+                results.innerHTML = '<div class="no-results">No users found.</div>';
+                return;
+            }
+
+            results.innerHTML = snap.docs.map(doc => {
+                const data = doc.data();
+                if (doc.id === auth.currentUser.uid) return ''; // Don't show self
+                return `
+                    <div class="search-result-item">
+                        <div class="search-result-user">
+                            <div class="friend-avatar">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${data.username}" alt="">
+                            </div>
+                            <span>${data.username}</span>
+                        </div>
+                        <button class="start-chat-btn" onclick="startChat('${doc.id}', '${data.username.replace(/'/g, "\\'")}')">Chat</button>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            console.error('Search failed:', err);
+            results.innerHTML = '<div class="error">Search failed.</div>';
+        }
+    }
+    window.startChat = async (friendId, friendName) => {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        // Hide modal
+        document.getElementById('add-friend-modal').classList.add('hidden');
+
+        // Check if room exists
+        try {
+            // Room ID is deterministic for 2 participants: sorted UIDs joined by underscore
+            const roomId = [user.uid, friendId].sort().join('_');
+            const roomRef = doc(db, 'chatRooms', roomId);
+            const roomSnap = await getDoc(roomRef);
+
+            if (!roomSnap.exists()) {
+                const userData = getCurrentUser();
+                await setDoc(roomRef, {
+                    participants: [user.uid, friendId],
+                    participantNames: {
+                        [user.uid]: userData.username,
+                        [friendId]: friendName
+                    },
+                    updatedAt: serverTimestamp()
+                });
+            }
+
+            openChatRoom(roomId, friendName);
+        } catch (err) {
+            console.error('Failed to start chat:', err);
+        }
     };
 
-    function renderMessages(messages) {
-        const chatMessages = document.getElementById('chat-view-messages');
+    function loadChatRooms() {
         const user = auth.currentUser;
-        if (!chatMessages) return;
+        if (!user) return;
 
-        if (messages.length === 0) {
-            chatMessages.innerHTML = '<div class="chat-welcome">No messages yet. Say hi!</div>';
-            return;
-        }
+        if (chatRoomsUnsubscribe) chatRoomsUnsubscribe();
 
-        const html = messages.map(msg => {
-            const isOwn = user && msg.userId === user.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
-            
-            return `
-                <div class="message ${isOwn ? 'own' : ''}">
-                    <div class="message-header">
-                        <span class="message-user">${msg.username}</span>
-                        ${msg.activeTitle ? `<span class="message-title">${msg.activeTitle}</span>` : ''}
+        const q = query(
+            collection(db, 'chatRooms'), 
+            where('participants', 'array-contains', user.uid),
+            orderBy('updatedAt', 'desc')
+        );
+
+        chatRoomsUnsubscribe = onSnapshot(q, (snapshot) => {
+            const friendsList = document.getElementById('friends-list');
+            if (!friendsList) return;
+
+            const rooms = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter(room => room.lastMessage || room.id === activeRoomId);
+
+            if (rooms.length === 0) {
+                friendsList.innerHTML = '<div class="empty-list">No chats yet.</div>';
+                return;
+            }
+
+            friendsList.innerHTML = rooms.map(room => {
+                const friendId = room.participants.find(p => p !== user.uid);
+                const friendName = room.participantNames[friendId];
+                const lastMsg = room.lastMessage || 'No messages yet';
+                const isActive = activeRoomId === room.id;
+
+                return `
+                    <div class="friend-item ${isActive ? 'active' : ''}" onclick="openChatRoom('${room.id}', '${friendName.replace(/'/g, "\\'")}')">
+                        <div class="friend-avatar">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${friendName}" alt="">
+                        </div>
+                        <div class="friend-details">
+                            <div class="friend-name">${friendName}</div>
+                            <div class="friend-last-msg">${lastMsg}</div>
+                        </div>
                     </div>
-                    <div class="message-content">${escapeHtml(msg.text)}</div>
-                    <div class="message-time">${time}</div>
-                </div>
-            `;
-        }).join('');
-
-        chatMessages.innerHTML = html;
-        scrollToBottom();
+                `;
+            }).join('');
+        });
     }
 
-    function scrollToBottom() {
-        const chatMessages = document.getElementById('chat-view-messages');
-        if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+    window.openChatRoom = (roomId, friendName) => {
+        activeRoomId = roomId;
+        
+        // Update UI
+        document.getElementById('chat-empty-state').classList.add('hidden');
+        document.getElementById('active-chat').classList.remove('hidden');
+        document.getElementById('active-friend-name').innerText = friendName;
+        document.getElementById('active-friend-img').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${friendName}`;
+        
+        // Highlight in sidebar
+        document.querySelectorAll('.friend-item').forEach(item => {
+            item.classList.toggle('active', item.getAttribute('onclick').includes(roomId));
+        });
+
+        listenToMessages(roomId);
+    };
+
+    function listenToMessages(roomId) {
+        if (activeChatUnsubscribe) activeChatUnsubscribe();
+
+        const q = query(
+            collection(db, 'chatRooms', roomId, 'messages'),
+            orderBy('timestamp', 'asc'),
+            limit(100)
+        );
+
+        activeChatUnsubscribe = onSnapshot(q, (snapshot) => {
+            const container = document.getElementById('private-messages');
+            if (!container) return;
+
+            const user = auth.currentUser;
+            container.innerHTML = snapshot.docs.map(doc => {
+                const msg = doc.data();
+                const isOwn = msg.senderId === user.uid;
+                const time = msg.timestamp ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+
+                return `
+                    <div class="message ${isOwn ? 'own' : ''}">
+                        <div class="message-content">${escapeHtml(msg.text)}</div>
+                        <div class="message-time">${time}</div>
+                    </div>
+                `;
+            }).join('');
+
+            container.scrollTop = container.scrollHeight;
+        });
+    }
+
+    async function sendPrivateMessage(roomId, text) {
+        const user = auth.currentUser;
+        const userData = getCurrentUser();
+        if (!user || !userData) return;
+
+        const messageData = {
+            senderId: user.uid,
+            senderName: userData.username,
+            text: text,
+            timestamp: serverTimestamp()
+        };
+
+        // Add message to subcollection
+        await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
+
+        // Update room's last message and timestamp
+        await updateDoc(doc(db, 'chatRooms', roomId), {
+            lastMessage: text,
+            updatedAt: serverTimestamp()
+        });
     }
 
     function escapeHtml(text) {
@@ -1068,7 +1106,7 @@ const auth = getAuth(app);
         document.getElementById('btn-leaderboard-global')?.addEventListener('click', () => showLeaderboard());
         document.getElementById('btn-open-shop')?.addEventListener('click', () => switchView('shop'));
         document.getElementById('btn-open-shop-videos')?.addEventListener('click', () => switchView('shop'));
-        document.getElementById('btn-open-chat')?.addEventListener('click', () => switchView('chat'));
+        document.getElementById('btn-open-shop-chat')?.addEventListener('click', () => switchView('shop'));
         document.getElementById('btn-close-leaderboard')?.addEventListener('click', () => {
             document.getElementById('leaderboard-modal')?.classList.add('hidden');
         });
@@ -1129,11 +1167,15 @@ const auth = getAuth(app);
         onAuthStateChanged(auth, (user) => {
             updateAuthUI(user);
             if (user) {
-                if (!chatUnsubscribe) initChat();
+                initPrivateChat();
             } else {
-                if (chatUnsubscribe) {
-                    chatUnsubscribe();
-                    chatUnsubscribe = null;
+                if (chatRoomsUnsubscribe) {
+                    chatRoomsUnsubscribe();
+                    chatRoomsUnsubscribe = null;
+                }
+                if (activeChatUnsubscribe) {
+                    activeChatUnsubscribe();
+                    activeChatUnsubscribe = null;
                 }
             }
         });

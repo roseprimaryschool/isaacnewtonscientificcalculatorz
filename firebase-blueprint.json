@@ -63,21 +63,35 @@
     },
     "PrivateMessage": {
       "title": "PrivateMessage",
-      "description": "A message in a private chat between two users",
+      "description": "A private message between two users",
       "type": "object",
       "properties": {
         "senderId": { "type": "string" },
         "senderName": { "type": "string" },
-        "receiverId": { "type": "string" },
         "text": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "senderName", "text", "timestamp"]
+    },
+    "ChatRoom": {
+      "title": "ChatRoom",
+      "description": "A private chat room between two users",
+      "type": "object",
+      "properties": {
         "participants": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Array of the two user UIDs involved"
-        }
+          "description": "List of user IDs in the chat"
+        },
+        "participantNames": {
+          "type": "object",
+          "description": "Map of userId to username"
+        },
+        "lastMessage": { "type": "string" },
+        "lastTimestamp": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["senderId", "senderName", "receiverId", "text", "timestamp", "participants"]
+      "required": ["participants", "updatedAt"]
     }
   },
   "firestore": {
@@ -89,9 +103,13 @@
       "schema": "ChatMessage",
       "description": "Global chat messages"
     },
-    "/private_messages/{messageId}": {
+    "/chatRooms/{roomId}": {
+      "schema": "ChatRoom",
+      "description": "Private chat rooms"
+    },
+    "/chatRooms/{roomId}/messages/{messageId}": {
       "schema": "PrivateMessage",
-      "description": "Private messages between users"
+      "description": "Messages within a private chat room"
     }
   }
 }

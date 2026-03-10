@@ -30,6 +30,15 @@ service cloud.firestore {
              (!('activeTitle' in data) || data.activeTitle is string);
     }
 
+    function isValidMessage(data) {
+      return data.keys().hasAll(['userId', 'username', 'text', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
+             (!('activeTitle' in data) || data.activeTitle is string) &&
+             (!('activeAvatar' in data) || data.activeAvatar is string);
+    }
+
     // ===============================================================
     // User profiles
     // ===============================================================
@@ -43,6 +52,20 @@ service cloud.firestore {
       allow update: if (isOwner(userId) || isAdmin()) && 
                       isValidUser(request.resource.data) &&
                       request.resource.data.username == resource.data.username; // Username immutable
+    }
+
+    // ===============================================================
+    // Global Chat
+    // ===============================================================
+    match /messages/{messageId} {
+      // Anyone authenticated can read messages
+      allow read: if isAuthenticated();
+      
+      // Only authenticated users can send messages, and they must be valid
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+      
+      // Only admins can delete or update messages
+      allow update, delete: if isAdmin();
     }
   }
 }

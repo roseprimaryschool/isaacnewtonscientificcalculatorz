@@ -46,12 +46,30 @@
         }
       },
       "required": ["username", "totalHours", "coins"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message in the global chat",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "activeTitle": { "type": "string" },
+        "activeAvatar": { "type": "string" }
+      },
+      "required": ["userId", "username", "text", "timestamp"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles and stats"
+    },
+    "/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Global chat messages"
     }
   }
 }

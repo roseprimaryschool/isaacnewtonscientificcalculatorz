@@ -302,6 +302,39 @@
                 </div>
             </div>
         </div>
+
+        <!-- Global Chat -->
+        <div id="chat-widget" class="chat-widget hidden">
+            <button id="btn-toggle-chat" class="chat-toggle-btn">
+                <i data-lucide="message-square"></i>
+                <span class="chat-badge hidden" id="chat-unread-count">0</span>
+            </button>
+            
+            <div id="chat-window" class="chat-window hidden">
+                <div class="chat-header">
+                    <div class="chat-title">
+                        <i data-lucide="message-circle"></i>
+                        <span>Global Chat</span>
+                    </div>
+                    <button id="btn-close-chat-window" class="chat-close-btn">
+                        <i data-lucide="minimize-2"></i>
+                    </button>
+                </div>
+                
+                <div id="chat-messages" class="chat-messages">
+                    <div class="chat-welcome">
+                        <p>Welcome to Nova Global Chat! Be respectful and have fun.</p>
+                    </div>
+                </div>
+                
+                <form id="chat-form" class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="Type a message..." maxlength="500" autocomplete="off">
+                    <button type="submit" id="btn-send-chat" class="chat-send-btn">
+                        <i data-lucide="send"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script src="https://unpkg.com/mathjs@11.8.0/lib/browser/math.js"></script>

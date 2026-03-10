@@ -4,7 +4,7 @@ import {
     getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { 
-    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp 
+    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, orderBy, limit, serverTimestamp, onSnapshot, addDoc 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -810,6 +810,119 @@ const auth = getAuth(app);
         if (iframe) iframe.src = '';
     }
 
+    // --- Global Chat Logic ---
+    let chatUnsubscribe = null;
+    let isChatOpen = false;
+    let unreadCount = 0;
+
+    function initChat() {
+        const chatWidget = document.getElementById('chat-widget');
+        const chatToggleBtn = document.getElementById('btn-toggle-chat');
+        const chatCloseBtn = document.getElementById('btn-close-chat-window');
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const unreadBadge = document.getElementById('chat-unread-count');
+
+        if (!chatWidget || !chatToggleBtn || !chatCloseBtn || !chatWindow || !chatForm || !chatInput || !chatMessages) return;
+
+        chatToggleBtn.addEventListener('click', () => {
+            isChatOpen = !isChatOpen;
+            chatWindow.classList.toggle('hidden', !isChatOpen);
+            if (isChatOpen) {
+                unreadCount = 0;
+                unreadBadge.classList.add('hidden');
+                scrollToBottom();
+                chatInput.focus();
+            }
+        });
+
+        chatCloseBtn.addEventListener('click', () => {
+            isChatOpen = false;
+            chatWindow.classList.add('hidden');
+        });
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = chatInput.value.trim();
+            const user = auth.currentUser;
+            const userData = getCurrentUser();
+
+            if (!text || !user || !userData) return;
+
+            try {
+                await addDoc(collection(db, 'messages'), {
+                    userId: user.uid,
+                    username: userData.username,
+                    text: text,
+                    timestamp: serverTimestamp(),
+                    activeTitle: userData.activeTitle || '',
+                    activeAvatar: userData.activeAvatar || ''
+                });
+                chatInput.value = '';
+            } catch (err) {
+                console.error('Failed to send message:', err);
+            }
+        });
+
+        // Listen for messages
+        const q = query(collection(db, 'messages'), orderBy('timestamp', 'desc'), limit(50));
+        chatUnsubscribe = onSnapshot(q, (snapshot) => {
+            const messages = [];
+            snapshot.forEach(doc => {
+                messages.push({ id: doc.id, ...doc.data() });
+            });
+            renderMessages(messages.reverse());
+            
+            if (!isChatOpen && !snapshot.metadata.hasPendingWrites) {
+                unreadCount += snapshot.docChanges().filter(change => change.type === 'added').length;
+                if (unreadCount > 0) {
+                    unreadBadge.innerText = unreadCount > 99 ? '99+' : unreadCount;
+                    unreadBadge.classList.remove('hidden');
+                }
+            }
+        });
+    }
+
+    function renderMessages(messages) {
+        const chatMessages = document.getElementById('chat-messages');
+        const user = auth.currentUser;
+        if (!chatMessages) return;
+
+        const html = messages.map(msg => {
+            const isOwn = user && msg.userId === user.uid;
+            const time = msg.timestamp ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+            
+            return `
+                <div class="message ${isOwn ? 'own' : ''}">
+                    <div class="message-header">
+                        <span class="message-user">${msg.username}</span>
+                        ${msg.activeTitle ? `<span class="message-title">${msg.activeTitle}</span>` : ''}
+                    </div>
+                    <div class="message-content">${escapeHtml(msg.text)}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+        }).join('');
+
+        chatMessages.innerHTML = html;
+        scrollToBottom();
+    }
+
+    function scrollToBottom() {
+        const chatMessages = document.getElementById('chat-messages');
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     function toggleFullscreen(elementId = 'game-player') {
         const player = document.getElementById(elementId);
         if (!player) return;
@@ -909,6 +1022,17 @@ const auth = getAuth(app);
         // Firebase Auth Listener
         onAuthStateChanged(auth, (user) => {
             updateAuthUI(user);
+            const chatWidget = document.getElementById('chat-widget');
+            if (user) {
+                chatWidget?.classList.remove('hidden');
+                if (!chatUnsubscribe) initChat();
+            } else {
+                chatWidget?.classList.add('hidden');
+                if (chatUnsubscribe) {
+                    chatUnsubscribe();
+                    chatUnsubscribe = null;
+                }
+            }
         });
 
         updateDisplay();

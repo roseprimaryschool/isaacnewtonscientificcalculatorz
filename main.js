@@ -355,6 +355,19 @@ const auth = getAuth(app);
         }
     }
 
+    function updateUserProfileUI() {
+        const user = getCurrentUser();
+        const avatarImg = document.getElementById('user-avatar-img');
+        if (user && avatarImg) {
+            if (user.activeAvatar) {
+                const avatarItem = SHOP_ITEMS.avatars.find(a => a.id === user.activeAvatar);
+                if (avatarItem) avatarImg.src = avatarItem.preview;
+            } else {
+                avatarImg.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
+            }
+        }
+    }
+
     function updateAuthUI(user = null) {
         const loginBtn = document.getElementById('btn-login-trigger');
         const profile = document.getElementById('user-profile');
@@ -370,6 +383,7 @@ const auth = getAuth(app);
                 if (nameDisplay) nameDisplay.innerText = currentUserData.username;
                 if (coinDisplay) coinDisplay.innerText = Math.floor(currentUserData.coins || 0);
                 applyTheme(currentUserData.activeTheme);
+                updateUserProfileUI();
             } else {
                 getDoc(doc(db, 'users', user.uid)).then(snap => {
                     if (snap.exists()) {
@@ -378,6 +392,7 @@ const auth = getAuth(app);
                         if (nameDisplay) nameDisplay.innerText = data.username;
                         if (coinDisplay) coinDisplay.innerText = Math.floor(data.coins || 0);
                         applyTheme(data.activeTheme);
+                        updateUserProfileUI();
                     }
                 });
             }
@@ -395,13 +410,22 @@ const auth = getAuth(app);
             { id: 'default', title: 'Emerald (Default)', price: 0, desc: 'The classic Nova look.', preview: 'https://picsum.photos/seed/emerald/300/200' },
             { id: 'cyberpunk', title: 'Cyberpunk', price: 500, desc: 'Neon lights and dark nights.', preview: 'https://picsum.photos/seed/cyberpunk/300/200' },
             { id: 'retro', title: 'Retro Terminal', price: 300, desc: 'Classic green phosphor vibe.', preview: 'https://picsum.photos/seed/terminal/300/200' },
-            { id: 'stealth', title: 'Stealth Mode', price: 1000, desc: 'Looks like a boring document.', preview: 'https://picsum.photos/seed/office/300/200' }
+            { id: 'stealth', title: 'Stealth Mode', price: 1000, desc: 'Looks like a boring document.', preview: 'https://picsum.photos/seed/office/300/200' },
+            { id: 'galaxy', title: 'Galaxy', price: 1000, desc: 'Animated cosmic journey.', preview: 'https://picsum.photos/seed/galaxy/300/200' },
+            { id: 'sunset', title: 'Sunset Horizon', price: 750, desc: 'Warm gradients and chill vibes.', preview: 'https://picsum.photos/seed/sunset/300/200' },
+            { id: 'retrowave', title: 'Retro Wave', price: 1200, desc: '80s synthwave aesthetics.', preview: 'https://picsum.photos/seed/synthwave/300/200' }
         ],
         titles: [
             { id: 'Novice', title: 'Novice', price: 100, desc: 'Just getting started.' },
             { id: 'Pro', title: 'Pro Gamer', price: 500, desc: 'You know your way around.' },
             { id: 'Legend', title: 'Legend', price: 2000, desc: 'A true Nova veteran.' },
             { id: 'Nova-God', title: 'Nova God', price: 5000, desc: 'The ultimate rank.' }
+        ],
+        avatars: [
+            { id: 'bot1', title: 'Nova Bot', price: 200, desc: 'A friendly companion.', preview: 'https://api.dicebear.com/7.x/bottts/svg?seed=Nova' },
+            { id: 'pixel1', title: 'Pixel Hero', price: 400, desc: 'Retro gaming icon.', preview: 'https://api.dicebear.com/7.x/pixel-art/svg?seed=Hero' },
+            { id: 'space1', title: 'Astronaut', price: 600, desc: 'Ready for lift off.', preview: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Space' },
+            { id: 'cyber1', title: 'Cyberpunk', price: 800, desc: 'Future is now.', preview: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Cyber' }
         ]
     };
 
@@ -418,13 +442,17 @@ const auth = getAuth(app);
         const items = SHOP_ITEMS[currentShopTab];
         
         grid.innerHTML = items.map(item => {
-            const isOwned = user && (currentShopTab === 'themes' ? 
-                user.ownedThemes?.includes(item.id) : 
-                user.ownedTitles?.includes(item.id));
+            const isOwned = user && (
+                currentShopTab === 'themes' ? user.ownedThemes?.includes(item.id) : 
+                currentShopTab === 'titles' ? user.ownedTitles?.includes(item.id) :
+                user.ownedAvatars?.includes(item.id)
+            );
             
-            const isActive = user && (currentShopTab === 'themes' ? 
-                user.activeTheme === item.id : 
-                user.activeTitle === item.id);
+            const isActive = user && (
+                currentShopTab === 'themes' ? user.activeTheme === item.id : 
+                currentShopTab === 'titles' ? user.activeTitle === item.id :
+                user.activeAvatar === item.id
+            );
 
             let btnText = 'Buy';
             let btnClass = 'can-buy';
@@ -444,8 +472,8 @@ const auth = getAuth(app);
 
             return `
                 <div class="shop-item">
-                    ${currentShopTab === 'themes' ? `
-                        <div class="item-preview">
+                    ${(currentShopTab === 'themes' || currentShopTab === 'avatars') ? `
+                        <div class="item-preview ${currentShopTab === 'avatars' ? 'avatar-preview' : ''}">
                             <img src="${item.preview}" alt="${item.title}">
                         </div>
                     ` : ''}
@@ -486,9 +514,9 @@ const auth = getAuth(app);
         if (!userData) return;
 
         const userCoins = userData.coins || 0;
-        const isOwned = type === 'themes' ? 
-            userData.ownedThemes?.includes(id) : 
-            userData.ownedTitles?.includes(id);
+        const isOwned = type === 'themes' ? userData.ownedThemes?.includes(id) : 
+                        type === 'titles' ? userData.ownedTitles?.includes(id) :
+                        userData.ownedAvatars?.includes(id);
 
         if (isOwned) {
             // Equip
@@ -498,12 +526,15 @@ const auth = getAuth(app);
                 if (type === 'themes') {
                     updateData.activeTheme = id;
                     applyTheme(id);
-                } else {
+                } else if (type === 'titles') {
                     updateData.activeTitle = id;
+                } else {
+                    updateData.activeAvatar = id;
                 }
                 await updateDoc(userRef, updateData);
                 setCurrentUser({ ...userData, ...updateData });
                 loadShop();
+                updateUserProfileUI();
             } catch (e) {
                 console.error('Equip failed:', e);
             }
@@ -527,13 +558,17 @@ const auth = getAuth(app);
                 updateData.ownedThemes = [...(userData.ownedThemes || []), id];
                 updateData.activeTheme = id;
                 applyTheme(id);
-            } else {
+            } else if (type === 'titles') {
                 updateData.ownedTitles = [...(userData.ownedTitles || []), id];
                 updateData.activeTitle = id;
+            } else {
+                updateData.ownedAvatars = [...(userData.ownedAvatars || []), id];
+                updateData.activeAvatar = id;
             }
 
             await updateDoc(userRef, updateData);
             setCurrentUser({ ...userData, ...updateData });
+            updateUserProfileUI();
             
             // Update UI
             const coinDisplay = document.getElementById('user-coins');

@@ -54,5 +54,13 @@
     "iframeUrl": "./polytrack.html",
     "color": "#10b981",
     "category": "Racing"
+  },
+  {
+    "id": "slope",
+    "title": "Slope",
+    "description": "A fast-paced 3D ball racing game. Avoid obstacles and stay on the track!",
+    "iframeUrl": "https://slope-game.github.io/",
+    "color": "#22c55e",
+    "category": "Action"
   }
 ]

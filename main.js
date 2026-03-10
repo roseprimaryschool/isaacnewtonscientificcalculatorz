@@ -429,14 +429,17 @@ const auth = getAuth(app);
             let btnText = 'Buy';
             let btnClass = 'can-buy';
             
+            const userCoins = user?.coins || 0;
+            
             if (isActive) {
                 btnText = 'Active';
                 btnClass = 'active';
             } else if (isOwned) {
                 btnText = 'Equip';
                 btnClass = 'can-buy';
-            } else if (user && user.coins < item.price) {
-                btnClass = 'owned'; // Disabled look
+            } else if (user && userCoins < item.price) {
+                btnClass = 'owned'; // Insufficient coins look
+                btnText = 'Buy';
             }
 
             return `
@@ -474,6 +477,9 @@ const auth = getAuth(app);
         }
 
         const userData = getCurrentUser();
+        if (!userData) return;
+
+        const userCoins = userData.coins || 0;
         const isOwned = type === 'themes' ? 
             userData.ownedThemes?.includes(id) : 
             userData.ownedTitles?.includes(id);
@@ -499,12 +505,16 @@ const auth = getAuth(app);
         }
 
         // Purchase
-        if (userData.coins < price) return;
+        if (typeof price !== 'number' || userCoins < price) {
+            console.log('Insufficient funds or invalid price');
+            return;
+        }
 
         try {
             const userRef = doc(db, 'users', user.uid);
+            const newCoins = Math.floor(userCoins - price);
             const updateData = {
-                coins: userData.coins - price
+                coins: newCoins
             };
             
             if (type === 'themes') {
@@ -554,7 +564,7 @@ const auth = getAuth(app);
             if (snap.exists()) {
                 const data = snap.data();
                 const newTotal = (data.totalHours || 0) + durationHours;
-                const newCoins = (data.coins || 0) + coinsEarned;
+                const newCoins = (data.coins || 0) + Math.floor(coinsEarned);
                 const newGameStats = { ...(data.gameStats || {}) };
                 newGameStats[currentGameId] = (newGameStats[currentGameId] || 0) + durationHours;
                 

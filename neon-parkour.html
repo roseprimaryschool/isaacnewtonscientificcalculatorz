@@ -26,6 +26,10 @@
 
         canvas {
             display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
         #ui {
@@ -33,7 +37,7 @@
             top: 20px;
             left: 20px;
             pointer-events: none;
-            z-index: 10;
+            z-index: 100;
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -130,19 +134,20 @@
         }
 
         .btn {
-            width: 65px;
-            height: 65px;
-            background: #000;
+            width: 70px;
+            height: 70px;
+            background: rgba(0, 0, 0, 0.9);
             border: 2px solid var(--neon-cyan);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--neon-cyan);
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
             box-shadow: 4px 4px 0px var(--neon-cyan);
+            pointer-events: auto;
         }
 
         .btn:active {
@@ -152,7 +157,7 @@
             color: #000;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 1366px), (pointer: coarse) {
             #mobile-controls { display: flex; }
         }
     </style>
@@ -196,6 +201,10 @@
         const chargeBar = document.getElementById('charge-bar');
         const coinVal = document.getElementById('coin-val');
         const message = document.getElementById('message');
+
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            document.body.classList.add('is-touch');
+        }
 
         let width, height;
         function resize() {
@@ -516,7 +525,7 @@
                     }
                 }
                 keys[key] = true; 
-            });
+            }, { passive: false });
             btn.addEventListener('touchend', (e) => { 
                 e.preventDefault(); 
                 if (id === 'btn-attack') {
@@ -533,7 +542,7 @@
                     return;
                 }
                 keys[key] = false; 
-            });
+            }, { passive: false });
         }
         setupMobileBtn('btn-left', 'KeyA');
         setupMobileBtn('btn-right', 'KeyD');

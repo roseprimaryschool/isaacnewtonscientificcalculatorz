@@ -259,6 +259,7 @@
                     <button class="shop-tab active" data-tab="themes">Themes</button>
                     <button class="shop-tab" data-tab="titles">Titles</button>
                     <button class="shop-tab" data-tab="avatars">Avatars</button>
+                    <button id="btn-daily-spin" class="daily-spin-btn"><i data-lucide="sparkles"></i> Daily Spin</button>
                 </div>
 
                 <div id="shop-grid" class="shop-grid">
@@ -272,6 +273,30 @@
                         <span><i data-lucide="refresh-cw"></i> UPDATES WEEKLY</span>
                     </div>
                 </footer>
+            </div>
+        </div>
+
+        <!-- Daily Spin Modal -->
+        <div id="daily-spin-modal" class="modal-overlay hidden">
+            <div class="spin-modal-content">
+                <button id="close-spin-modal" class="modal-close-btn"><i data-lucide="x"></i></button>
+                <h2>DAILY REWARD WHEEL</h2>
+                <p>Spin once a day to win Pixel Coins!</p>
+                
+                <div class="wheel-container">
+                    <div class="wheel-needle"></div>
+                    <div id="spin-wheel" class="wheel">
+                        <!-- Segments will be rendered via CSS/JS -->
+                        <div class="segment" style="--i:0; --color:#ef4444; --rotate:0deg; --skew:0deg;"><span>10</span></div>
+                        <div class="segment" style="--i:1; --color:#f59e0b; --rotate:144deg; --skew:0deg;"><span>50</span></div>
+                        <div class="segment" style="--i:2; --color:#10b981; --rotate:216deg; --skew:0deg;"><span>100</span></div>
+                        <div class="segment" style="--i:3; --color:#3b82f6; --rotate:288deg; --skew:0deg;"><span>200</span></div>
+                        <div class="segment" style="--i:4; --color:#8b5cf6; --rotate:342deg; --skew:0deg;"><span>500</span></div>
+                    </div>
+                </div>
+
+                <button id="spin-button" class="spin-trigger-btn">SPIN WHEEL</button>
+                <div id="spin-result" class="spin-result hidden"></div>
             </div>
         </div>
 

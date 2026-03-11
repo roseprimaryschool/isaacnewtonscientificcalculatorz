@@ -1184,6 +1184,116 @@ function handleFirestoreError(error, operationType, path) {
         }
     }
 
+    // --- Daily Spin Logic ---
+    function initDailySpin() {
+        const modal = document.getElementById('daily-spin-modal');
+        const btnOpen = document.getElementById('btn-daily-spin');
+        const btnClose = document.getElementById('close-spin-modal');
+        const btnSpin = document.getElementById('spin-button');
+        const wheel = document.getElementById('spin-wheel');
+        const resultEl = document.getElementById('spin-result');
+
+        if (!modal || !btnOpen || !btnClose || !btnSpin || !wheel) return;
+
+        btnOpen.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+            resultEl.classList.add('hidden');
+            wheel.style.transition = 'none';
+            wheel.style.transform = 'rotate(0deg)';
+            
+            // Check if already spun today
+            const lastSpin = localStorage.getItem('last_spin_date');
+            const today = new Date().toDateString();
+            if (lastSpin === today) {
+                btnSpin.disabled = true;
+                btnSpin.innerText = 'ALREADY SPUN TODAY';
+            } else {
+                btnSpin.disabled = false;
+                btnSpin.innerText = 'SPIN WHEEL';
+            }
+        });
+
+        btnClose.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        btnSpin.addEventListener('click', async () => {
+            if (btnSpin.disabled) return;
+            
+            const user = auth.currentUser;
+            if (!user) {
+                alert('Please log in to spin the wheel!');
+                return;
+            }
+
+            btnSpin.disabled = true;
+            btnSpin.innerText = 'SPINNING...';
+
+            // Probabilities and results
+            // 10: 40% (0.0-0.4), 50: 20% (0.4-0.6), 100: 20% (0.6-0.8), 200: 15% (0.8-0.95), 500: 5% (0.95-1.0)
+            const options = [
+                { val: 10, angle: 72, prob: 0.4 },
+                { val: 50, angle: 180, prob: 0.2 },
+                { val: 100, angle: 252, prob: 0.2 },
+                { val: 200, angle: 315, prob: 0.15 },
+                { val: 500, angle: 351, prob: 0.05 }
+            ];
+
+            const rand = Math.random();
+            let cumulative = 0;
+            let selected = options[0];
+            for (const opt of options) {
+                cumulative += opt.prob;
+                if (rand <= cumulative) {
+                    selected = opt;
+                    break;
+                }
+            }
+
+            // Calculate final rotation
+            // We want the needle (at the top) to point to the selected segment
+            // The segment is at angle 'selected.angle' on the wheel (clockwise from top)
+            // So we need to rotate the wheel by (360 - selected.angle)
+            const rotations = 5 + Math.floor(Math.random() * 5);
+            const finalAngle = rotations * 360 + (360 - selected.angle);
+
+            wheel.style.transition = 'transform 4s cubic-bezier(0.15, 0, 0.15, 1)';
+            wheel.style.transform = `rotate(${finalAngle}deg)`;
+
+            setTimeout(async () => {
+                const userData = getCurrentUser();
+                if (userData) {
+                    const newCoins = (userData.coins || 0) + selected.val;
+                    try {
+                        const userRef = doc(db, 'users', user.uid);
+                        await updateDoc(userRef, {
+                            coins: newCoins,
+                            updatedAt: serverTimestamp()
+                        });
+                        
+                        // Update local state and UI
+                        setCurrentUser({ ...userData, coins: newCoins });
+                        
+                        const coinDisplay = document.getElementById('user-coins');
+                        const shopCoinDisplay = document.getElementById('shop-user-coins');
+                        if (coinDisplay) coinDisplay.innerText = Math.floor(newCoins);
+                        if (shopCoinDisplay) shopCoinDisplay.innerText = Math.floor(newCoins);
+                        
+                        resultEl.innerText = `YOU WON ${selected.val} COINS!`;
+                        resultEl.classList.remove('hidden');
+                        
+                        localStorage.setItem('last_spin_date', new Date().toDateString());
+                        btnSpin.innerText = 'ALREADY SPUN TODAY';
+                    } catch (err) {
+                        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+                        btnSpin.disabled = false;
+                        btnSpin.innerText = 'SPIN WHEEL';
+                    }
+                }
+            }, 4100);
+        });
+    }
+
     function init() {
         testConnection();
         // Attach Listeners
@@ -1274,6 +1384,7 @@ function handleFirestoreError(error, operationType, path) {
 
         updateDisplay();
         loadGames();
+        initDailySpin();
         if (window.lucide) window.lucide.createIcons();
     }
 

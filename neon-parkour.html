@@ -329,7 +329,7 @@
                     platforms.push({ x: curX, y: curY, w: w, h: 40, type, ...extra });
                     
                     // Spikes on flat platforms: ensure at least 100px of safe space
-                    if (Math.random() > 0.6 && type === 'normal') {
+                    if (Math.random() > (num >= 3 ? 0.4 : 0.6) && type === 'normal') {
                         const maxSpikeW = Math.max(20, w - 120);
                         const spikeW = 30 + Math.random() * maxSpikeW;
                         // Place spike at the end, but leave room
@@ -365,13 +365,13 @@
                 }
 
                 // Enemies (Sectors 3+)
-                if (num >= 3 && Math.random() > 0.4) {
+                if (num >= 3 && Math.random() > 0.3) {
                     enemies.push({
                         x: curX + w/2,
                         y: curY - 40,
                         w: 30,
                         h: 30,
-                        vx: 2,
+                        vx: num >= 4 ? 3 : 2,
                         platform: { x: curX, w: w },
                         health: 1,
                         type: 'drone'
@@ -379,7 +379,7 @@
                 }
 
                 // Lasers (Sectors 2+)
-                if (num >= 2 && Math.random() > 0.6) {
+                if (num >= 2 && Math.random() > (num >= 3 ? 0.4 : 0.6)) {
                     lasers.push({ x: curX + 10, y: curY - 300, w: 12, h: 300, state: 'off', timer: Math.random() * 120 });
                 }
 
@@ -406,8 +406,9 @@
         }
 
         function resetPlayer() {
+            const startPlatform = platforms[0] || { y: height - 150 };
             player.x = 100;
-            player.y = height - 300;
+            player.y = startPlatform.y - player.h - 150;
             player.vx = 0;
             player.vy = 0;
             player.jumps = 0;
@@ -789,7 +790,7 @@
             }
 
             // Fall off
-            if (player.y > height + 1000) {
+            if (player.y > height + 500) {
                 showMsg("REBOOTING...");
                 resetPlayer();
             }

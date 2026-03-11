@@ -2129,3 +2129,188 @@ body.theme-retrowave .main-display {
     background: rgba(255, 255, 255, 0.1);
     color: white;
 }
+
+/* Daily Spin Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    transition: opacity 0.3s;
+}
+
+.modal-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.spin-modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 40px;
+    border-radius: 24px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.spin-modal-content h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: white;
+}
+
+.spin-modal-content p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 30px;
+}
+
+.modal-close-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px;
+}
+
+.wheel-container {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 0 auto 30px;
+}
+
+.wheel-needle {
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 40px;
+    background: white;
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    border: 8px solid #2d2d2d;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+    transition: transform 4s cubic-bezier(0.15, 0, 0.15, 1);
+    background: conic-gradient(
+        #ef4444 0deg 144deg,
+        #f59e0b 144deg 216deg,
+        #10b981 216deg 288deg,
+        #3b82f6 288deg 342deg,
+        #8b5cf6 342deg 360deg
+    );
+}
+
+.segment {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    top: 50%;
+    left: 50%;
+    transform-origin: 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.segment span {
+    position: absolute;
+    color: white;
+    font-weight: 900;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Position labels in the middle of each arc */
+.segment:nth-child(1) { transform: rotate(72deg) translateY(-80px); } /* 144/2 = 72 */
+.segment:nth-child(2) { transform: rotate(180deg) translateY(-80px); } /* 144 + 72/2 = 180 */
+.segment:nth-child(3) { transform: rotate(252deg) translateY(-80px); } /* 216 + 72/2 = 252 */
+.segment:nth-child(4) { transform: rotate(315deg) translateY(-80px); } /* 288 + 54/2 = 315 */
+.segment:nth-child(5) { transform: rotate(351deg) translateY(-80px); } /* 342 + 18/2 = 351 */
+
+.spin-trigger-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 12px;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    width: 100%;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.spin-trigger-btn:hover {
+    background: #10b981;
+    transform: translateY(-2px);
+}
+
+.spin-trigger-btn:disabled {
+    background: #4b5563;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.spin-result {
+    margin-top: 20px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    animation: bounceIn 0.5s;
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); opacity: 1; }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+}
+
+.daily-spin-btn {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid #8b5cf6;
+    color: #a78bfa;
+    padding: 8px 16px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    transition: all 0.2s;
+}
+
+.daily-spin-btn:hover {
+    background: rgba(139, 92, 246, 0.2);
+    transform: translateY(-1px);
+}

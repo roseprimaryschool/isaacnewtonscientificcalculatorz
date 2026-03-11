@@ -23,6 +23,48 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 const auth = getAuth(app);
 
+// --- Firestore Error Handling ---
+const OperationType = {
+    CREATE: 'create',
+    UPDATE: 'update',
+    DELETE: 'delete',
+    LIST: 'list',
+    GET: 'get',
+    WRITE: 'write',
+};
+
+function handleFirestoreError(error, operationType, path) {
+    const errInfo = {
+        error: error instanceof Error ? error.message : String(error),
+        authInfo: {
+            userId: auth.currentUser?.uid,
+            email: auth.currentUser?.email,
+            emailVerified: auth.currentUser?.emailVerified,
+            isAnonymous: auth.currentUser?.isAnonymous,
+            tenantId: auth.currentUser?.tenantId,
+            providerInfo: auth.currentUser?.providerData.map(provider => ({
+                providerId: provider.providerId,
+                displayName: provider.displayName,
+                email: provider.email,
+                photoUrl: provider.photoURL
+            })) || []
+        },
+        operationType,
+        path
+    };
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+    
+    // Show user-friendly error
+    const errorEl = document.getElementById('auth-error'); // Reuse auth error or show a toast
+    if (errorEl) {
+        errorEl.innerText = "A database error occurred. Please try again.";
+        errorEl.classList.remove('hidden');
+        setTimeout(() => errorEl.classList.add('hidden'), 5000);
+    }
+    
+    throw new Error(JSON.stringify(errInfo));
+}
+
 (function() {
     // --- State ---
     let displayValue = '0';
@@ -395,6 +437,7 @@ const auth = getAuth(app);
                 applyTheme(currentUserData.activeTheme);
                 updateUserProfileUI();
             } else {
+                const path = `users/${user.uid}`;
                 getDoc(doc(db, 'users', user.uid)).then(snap => {
                     if (snap.exists()) {
                         const data = snap.data();
@@ -404,7 +447,7 @@ const auth = getAuth(app);
                         applyTheme(data.activeTheme);
                         updateUserProfileUI();
                     }
-                });
+                }).catch(err => handleFirestoreError(err, OperationType.GET, path));
             }
         } else {
             if (loginBtn) loginBtn.classList.remove('hidden');
@@ -661,7 +704,7 @@ const auth = getAuth(app);
                 if (coinDisplay) coinDisplay.innerText = Math.floor(newCoins);
             }
         } catch (e) {
-            console.error('Failed to update playtime:', e);
+            handleFirestoreError(e, OperationType.WRITE, `users/${user.uid}`);
         }
 
         gameStartTime = Date.now(); // Reset for continuous tracking
@@ -825,7 +868,11 @@ const auth = getAuth(app);
     let activeChatUnsubscribe = null;
     let activeRoomId = null;
 
+    let isChatInitialized = false;
     function initPrivateChat() {
+        if (isChatInitialized) return;
+        isChatInitialized = true;
+
         const addFriendBtn = document.getElementById('btn-add-friend');
         const closeAddFriendBtn = document.getElementById('btn-close-add-friend');
         const addFriendModal = document.getElementById('add-friend-modal');
@@ -914,8 +961,7 @@ const auth = getAuth(app);
                 });
             });
         } catch (err) {
-            console.error('Search failed:', err);
-            results.innerHTML = '<div class="error">Search failed.</div>';
+            handleFirestoreError(err, OperationType.LIST, 'users');
         }
     }
     async function startChat(friendId, friendName) {
@@ -951,7 +997,7 @@ const auth = getAuth(app);
 
             openChatRoom(roomId, friendName);
         } catch (err) {
-            console.error('Failed to start chat:', err);
+            handleFirestoreError(err, OperationType.WRITE, `chatRooms`);
         }
     }
     window.startChat = startChat;
@@ -1005,7 +1051,7 @@ const auth = getAuth(app);
                     openChatRoom(item.dataset.roomId, item.dataset.friendName);
                 });
             });
-        });
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'chatRooms'));
     }
 
     function openChatRoom(roomId, friendName) {
@@ -1063,7 +1109,7 @@ const auth = getAuth(app);
             }).join('');
 
             container.scrollTop = container.scrollHeight;
-        });
+        }, (err) => handleFirestoreError(err, OperationType.GET, `chatRooms/${roomId}/messages`));
     }
 
     async function sendPrivateMessage(roomId, text) {
@@ -1078,14 +1124,18 @@ const auth = getAuth(app);
             timestamp: serverTimestamp()
         };
 
-        // Add message to subcollection
-        await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
+        try {
+            // Add message to subcollection
+            await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
 
-        // Update room's last message and timestamp
-        await updateDoc(doc(db, 'chatRooms', roomId), {
-            lastMessage: text,
-            updatedAt: serverTimestamp()
-        });
+            // Update room's last message and timestamp
+            await updateDoc(doc(db, 'chatRooms', roomId), {
+                lastMessage: text,
+                updatedAt: serverTimestamp()
+            });
+        } catch (err) {
+            handleFirestoreError(err, OperationType.WRITE, `chatRooms/${roomId}`);
+        }
     }
 
     function escapeHtml(text) {
@@ -1121,7 +1171,21 @@ const auth = getAuth(app);
     }
 
     // --- Init ---
+    async function testConnection() {
+        try {
+            // Test connection to Firestore
+            const { getDocFromServer } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+            await getDocFromServer(doc(db, 'test', 'connection'));
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('the client is offline')) {
+                console.error("Please check your Firebase configuration. ");
+            }
+            // Skip logging for other errors, as this is simply a connection test.
+        }
+    }
+
     function init() {
+        testConnection();
         // Attach Listeners
         document.getElementById('btn-clear')?.addEventListener('click', clear);
         document.getElementById('btn-equal')?.addEventListener('click', calculate);

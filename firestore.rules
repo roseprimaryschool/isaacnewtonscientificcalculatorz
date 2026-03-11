@@ -42,7 +42,15 @@ service cloud.firestore {
     function isValidChatRoom(data) {
       return data.keys().hasAll(['participants', 'updatedAt']) &&
              data.participants is list && data.participants.size() == 2 &&
-             request.auth.uid in data.participants;
+             request.auth.uid in data.participants &&
+             (!('participantNames' in data) || data.participantNames is map);
+    }
+
+    function isValidChatRoomUpdate(data) {
+       // Participants should be immutable
+       return data.participants == resource.data.participants &&
+              (!('participantNames' in data) || data.participantNames == resource.data.participantNames) &&
+              (!('lastMessage' in data) || data.lastMessage is string);
     }
 
     function isValidPrivateMessage(data) {
@@ -86,7 +94,7 @@ service cloud.firestore {
     match /chatRooms/{roomId} {
       allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
       allow create: if isAuthenticated() && isValidChatRoom(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants && isValidChatRoomUpdate(request.resource.data);
       
       match /messages/{messageId} {
         allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants;

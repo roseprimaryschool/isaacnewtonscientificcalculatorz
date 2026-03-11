@@ -62,5 +62,13 @@
     "iframeUrl": "https://slope-game.github.io/",
     "color": "#22c55e",
     "category": "Action"
+  },
+  {
+    "id": "neonparkour",
+    "title": "Neon Parkour",
+    "description": "Parkour through a neon city. Every 3 floors, fight off waves of enemies with your sword!",
+    "iframeUrl": "./neon-parkour.html",
+    "color": "#00ffcc",
+    "category": "Action"
   }
 ]

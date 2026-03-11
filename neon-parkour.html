@@ -310,7 +310,7 @@
                 // Instead of one long platform, sometimes create "stepping stones"
                 if (num >= 2 && Math.random() > 0.4 && type === 'normal') {
                     const stoneCount = 2 + Math.floor(Math.random() * 2);
-                    const stoneW = 50 + Math.random() * 30;
+                    const stoneW = 60 + Math.random() * 40; // Slightly wider stones
                     const totalStonesW = stoneCount * stoneW;
                     const stoneGap = (w - totalStonesW) / (stoneCount - 1);
                     
@@ -319,17 +319,20 @@
                         const sy = curY + (Math.random() - 0.5) * 60;
                         platforms.push({ x: sx, y: sy, w: stoneW, h: 30, type: 'normal' });
                         
-                        // Small chance of spike on a stepping stone
-                        if (Math.random() > 0.8) {
-                            spikes.push({ x: sx + 5, y: sy - 15, w: stoneW - 10, h: 15 });
+                        // Spikes on stepping stones: only from Sector 4+, and never on the first stone
+                        if (num >= 4 && s > 0 && Math.random() > 0.85) {
+                            const sw = stoneW * 0.4; // Spike only covers 40% of the stone
+                            spikes.push({ x: sx + (stoneW - sw)/2, y: sy - 15, w: sw, h: 15 });
                         }
                     }
                 } else {
                     platforms.push({ x: curX, y: curY, w: w, h: 40, type, ...extra });
                     
-                    // Spikes on flat platforms
+                    // Spikes on flat platforms: ensure at least 100px of safe space
                     if (Math.random() > 0.6 && type === 'normal') {
-                        const spikeW = 40 + Math.random() * 60;
+                        const maxSpikeW = Math.max(20, w - 120);
+                        const spikeW = 30 + Math.random() * maxSpikeW;
+                        // Place spike at the end, but leave room
                         spikes.push({ x: curX + w - spikeW - 10, y: curY - 15, w: spikeW, h: 15 });
                     }
                 }

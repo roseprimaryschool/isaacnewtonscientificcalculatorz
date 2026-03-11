@@ -373,7 +373,7 @@ const auth = getAuth(app);
                 const avatarItem = SHOP_ITEMS.avatars.find(a => a.id === user.activeAvatar);
                 if (avatarItem) avatarImg.src = avatarItem.preview;
             } else {
-                avatarImg.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
+                avatarImg.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.username)}`;
             }
         }
     }
@@ -899,25 +899,32 @@ const auth = getAuth(app);
                     <div class="search-result-item">
                         <div class="search-result-user">
                             <div class="friend-avatar">
-                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${data.username}" alt="">
+                                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.username)}" alt="">
                             </div>
                             <span>${data.username}</span>
                         </div>
-                        <button class="start-chat-btn" onclick="startChat('${doc.id}', '${data.username.replace(/'/g, "\\'")}')">Chat</button>
+                        <button class="start-chat-btn" data-id="${doc.id}" data-name="${data.username}">Chat</button>
                     </div>
                 `;
             }).join('');
+
+            results.querySelectorAll('.start-chat-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    startChat(btn.dataset.id, btn.dataset.name);
+                });
+            });
         } catch (err) {
             console.error('Search failed:', err);
             results.innerHTML = '<div class="error">Search failed.</div>';
         }
     }
-    window.startChat = async (friendId, friendName) => {
+    async function startChat(friendId, friendName) {
         const user = auth.currentUser;
         if (!user) return;
 
         // Hide modal
-        document.getElementById('add-friend-modal').classList.add('hidden');
+        const modal = document.getElementById('add-friend-modal');
+        if (modal) modal.classList.add('hidden');
 
         // Check if room exists
         try {
@@ -928,6 +935,10 @@ const auth = getAuth(app);
 
             if (!roomSnap.exists()) {
                 const userData = getCurrentUser();
+                if (!userData) {
+                    console.error('User data not loaded yet');
+                    return;
+                }
                 await setDoc(roomRef, {
                     participants: [user.uid, friendId],
                     participantNames: {
@@ -942,7 +953,8 @@ const auth = getAuth(app);
         } catch (err) {
             console.error('Failed to start chat:', err);
         }
-    };
+    }
+    window.startChat = startChat;
 
     function loadChatRooms() {
         const user = auth.currentUser;
@@ -976,9 +988,9 @@ const auth = getAuth(app);
                 const isActive = activeRoomId === room.id;
 
                 return `
-                    <div class="friend-item ${isActive ? 'active' : ''}" onclick="openChatRoom('${room.id}', '${friendName.replace(/'/g, "\\'")}')">
+                    <div class="friend-item ${isActive ? 'active' : ''}" data-room-id="${room.id}" data-friend-name="${friendName}">
                         <div class="friend-avatar">
-                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${friendName}" alt="">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(friendName)}" alt="">
                         </div>
                         <div class="friend-details">
                             <div class="friend-name">${friendName}</div>
@@ -987,25 +999,41 @@ const auth = getAuth(app);
                     </div>
                 `;
             }).join('');
+
+            friendsList.querySelectorAll('.friend-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    openChatRoom(item.dataset.roomId, item.dataset.friendName);
+                });
+            });
         });
     }
 
-    window.openChatRoom = (roomId, friendName) => {
+    function openChatRoom(roomId, friendName) {
         activeRoomId = roomId;
         
         // Update UI
-        document.getElementById('chat-empty-state').classList.add('hidden');
-        document.getElementById('active-chat').classList.remove('hidden');
-        document.getElementById('active-friend-name').innerText = friendName;
-        document.getElementById('active-friend-img').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${friendName}`;
+        const emptyState = document.getElementById('chat-empty-state');
+        const activeChat = document.getElementById('active-chat');
+        const friendNameEl = document.getElementById('active-friend-name');
+        const friendImgEl = document.getElementById('active-friend-img');
+
+        if (emptyState) emptyState.classList.add('hidden');
+        if (activeChat) activeChat.classList.remove('hidden');
+        if (friendNameEl) friendNameEl.innerText = friendName;
+        if (friendImgEl) friendImgEl.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(friendName)}`;
         
         // Highlight in sidebar
         document.querySelectorAll('.friend-item').forEach(item => {
-            item.classList.toggle('active', item.getAttribute('onclick').includes(roomId));
+            if (item.dataset.roomId === roomId) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
         });
 
         listenToMessages(roomId);
-    };
+    }
+    window.openChatRoom = openChatRoom;
 
     function listenToMessages(roomId) {
         if (activeChatUnsubscribe) activeChatUnsubscribe();

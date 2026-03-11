@@ -407,8 +407,8 @@
             player.isDashing = false;
             player.dashTimer = 0;
             health = 100;
-            healthBar.style.width = '100%';
-            chargeBar.style.width = '0%';
+            if (healthBar) healthBar.style.width = '100%';
+            if (chargeBar) chargeBar.style.width = '0%';
             isTransitioning = false;
             transitionAlpha = 0;
         }
@@ -423,7 +423,7 @@
                 if (transitionAlpha >= 1) {
                     clearInterval(fadeOut);
                     sector++;
-                    sectorVal.innerText = sector < 10 ? '0' + sector : sector;
+                    if (sectorVal) sectorVal.innerText = sector < 10 ? '0' + sector : sector;
                     generateSector(sector);
                     resetPlayer();
                 }
@@ -468,7 +468,7 @@
                     }
                     player.isCharging = false;
                     player.charge = 0;
-                    chargeBar.style.width = '0%';
+                    if (chargeBar) chargeBar.style.width = '0%';
                 }
             }
             keys[e.code] = false;
@@ -491,6 +491,7 @@
 
         function setupMobileBtn(id, key) {
             const btn = document.getElementById(id);
+            if (!btn) return;
             btn.addEventListener('touchstart', (e) => { 
                 e.preventDefault(); 
                 if (isTransitioning) return;
@@ -527,7 +528,7 @@
                         }
                         player.isCharging = false;
                         player.charge = 0;
-                        chargeBar.style.width = '0%';
+                        if (chargeBar) chargeBar.style.width = '0%';
                     }
                     return;
                 }

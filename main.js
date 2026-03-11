@@ -4,7 +4,7 @@ import {
     getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { 
-    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, orderBy, limit, serverTimestamp, onSnapshot, addDoc 
+    getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where, orderBy, limit, serverTimestamp, onSnapshot, addDoc, increment 
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -1230,13 +1230,13 @@ function handleFirestoreError(error, operationType, path) {
             btnSpin.innerText = 'SPINNING...';
 
             // Probabilities and results
-            // 10: 40% (0.0-0.4), 50: 20% (0.4-0.6), 100: 20% (0.6-0.8), 200: 15% (0.8-0.95), 500: 5% (0.95-1.0)
+            // We use equal visual segments (72deg each) but weighted probabilities
             const options = [
-                { val: 10, angle: 72, prob: 0.4 },
-                { val: 50, angle: 180, prob: 0.2 },
-                { val: 100, angle: 252, prob: 0.2 },
-                { val: 200, angle: 315, prob: 0.15 },
-                { val: 500, angle: 351, prob: 0.05 }
+                { val: 10, angle: 36, prob: 0.4 },
+                { val: 50, angle: 108, prob: 0.2 },
+                { val: 100, angle: 180, prob: 0.2 },
+                { val: 200, angle: 252, prob: 0.15 },
+                { val: 500, angle: 324, prob: 0.05 }
             ];
 
             const rand = Math.random();
@@ -1251,11 +1251,10 @@ function handleFirestoreError(error, operationType, path) {
             }
 
             // Calculate final rotation
-            // We want the needle (at the top) to point to the selected segment
-            // The segment is at angle 'selected.angle' on the wheel (clockwise from top)
-            // So we need to rotate the wheel by (360 - selected.angle)
+            // Add a small random offset within the 72deg segment (+/- 20deg) to look natural
+            const offset = (Math.random() - 0.5) * 40;
             const rotations = 5 + Math.floor(Math.random() * 5);
-            const finalAngle = rotations * 360 + (360 - selected.angle);
+            const finalAngle = (rotations * 360) + (360 - selected.angle) + offset;
 
             wheel.style.transition = 'transform 4s cubic-bezier(0.15, 0, 0.15, 1)';
             wheel.style.transform = `rotate(${finalAngle}deg)`;
@@ -1263,15 +1262,15 @@ function handleFirestoreError(error, operationType, path) {
             setTimeout(async () => {
                 const userData = getCurrentUser();
                 if (userData) {
-                    const newCoins = (userData.coins || 0) + selected.val;
                     try {
                         const userRef = doc(db, 'users', user.uid);
                         await updateDoc(userRef, {
-                            coins: newCoins,
+                            coins: increment(selected.val),
                             updatedAt: serverTimestamp()
                         });
                         
                         // Update local state and UI
+                        const newCoins = (userData.coins || 0) + selected.val;
                         setCurrentUser({ ...userData, coins: newCoins });
                         
                         const coinDisplay = document.getElementById('user-coins');

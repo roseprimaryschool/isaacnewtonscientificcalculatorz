@@ -248,14 +248,22 @@
 
         function initBuildings() {
             buildings = [];
-            for(let i = 0; i < 30; i++) {
+            const colors = ['#00f2ff', '#ff0055', '#00ff00', '#ffff00', '#ff00ff'];
+            for(let i = 0; i < 40; i++) {
                 buildings.push({
                     x: Math.random() * 5000,
-                    y: height - (200 + Math.random() * 800),
-                    w: 100 + Math.random() * 200,
+                    y: height - (300 + Math.random() * 600),
+                    w: 120 + Math.random() * 200,
                     h: 2000,
-                    parallax: 0.1 + Math.random() * 0.3,
-                    seed: Math.random()
+                    parallax: 0.05 + Math.random() * 0.2,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    windows: Array.from({length: 15}, () => ({
+                        x: 0.1 + Math.random() * 0.8,
+                        y: 0.05 + Math.random() * 0.9,
+                        w: 0.05 + Math.random() * 0.1,
+                        h: 0.02 + Math.random() * 0.03,
+                        on: Math.random() > 0.3
+                    }))
                 });
             }
         }
@@ -801,7 +809,12 @@
         }
 
         function draw() {
-            ctx.fillStyle = varColor('--bg-dark');
+            // Background Gradient
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+            bgGrad.addColorStop(0, '#050508');
+            bgGrad.addColorStop(0.7, '#0a0a15');
+            bgGrad.addColorStop(1, '#1a0a1a');
+            ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, width, height);
             
             ctx.strokeStyle = varColor('--grid-line');
@@ -823,9 +836,23 @@
             buildings.forEach(b => {
                 const bx = (b.x + cameraX * b.parallax) % 5000;
                 const drawX = bx < -b.w ? bx + 5000 : bx;
-                ctx.strokeStyle = `rgba(0, 242, 255, ${0.05 + b.parallax * 0.2})`;
+                const drawY = b.y + cameraY * b.parallax;
+                
+                // Building Outline
+                ctx.strokeStyle = b.color;
+                ctx.globalAlpha = 0.1 + b.parallax * 0.3;
                 ctx.lineWidth = 2;
-                ctx.strokeRect(drawX, b.y + cameraY * b.parallax, b.w, b.h);
+                ctx.strokeRect(drawX, drawY, b.w, b.h);
+                
+                // Windows
+                ctx.fillStyle = b.color;
+                b.windows.forEach(w => {
+                    if (w.on) {
+                        ctx.globalAlpha = 0.2 + b.parallax * 0.4;
+                        ctx.fillRect(drawX + w.x * b.w, drawY + w.y * 800, w.w * b.w, w.h * 800);
+                    }
+                });
+                ctx.globalAlpha = 1.0;
             });
 
             ctx.save();
@@ -1001,27 +1028,67 @@
             });
             ctx.globalAlpha = 1.0;
 
-            // Player
+            // Player (Stickman)
             ctx.save();
             ctx.translate(player.x + player.w/2, player.y + player.h/2);
             
             // Dash trail
             if (player.isDashing) {
-                ctx.fillStyle = 'rgba(0, 242, 255, 0.3)';
-                ctx.fillRect(-player.w * 2 * player.facing, -player.h/2, player.w * 2, player.h);
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = varColor('--neon-cyan');
+                ctx.beginPath();
+                ctx.arc(-player.w * player.facing, 0, 15, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
             }
 
-            ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#fff';
-            ctx.fillRect(-player.w/2, -player.h/2, player.w, player.h);
-            ctx.shadowBlur = 0;
-            
-            // Eye
-            ctx.fillStyle = varColor('--neon-pink');
-            ctx.fillRect(player.facing === 1 ? 5 : -13, -9, 8, 4);
+            const stickColor = '#fff';
+            ctx.strokeStyle = stickColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = stickColor;
 
-            // Sword
+            // Animation values
+            const walkCycle = Math.sin(frameCount * 0.2) * 10;
+            const jumpStretch = Math.min(10, Math.abs(player.vy));
+            
+            // Head
+            ctx.beginPath();
+            ctx.arc(0, -15, 8, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Body
+            ctx.beginPath();
+            ctx.moveTo(0, -7);
+            ctx.lineTo(0, 10);
+            ctx.stroke();
+            
+            // Arms
+            ctx.beginPath();
+            if (player.isAttacking) {
+                // Attacking arm
+                ctx.moveTo(0, -2);
+                ctx.lineTo(player.facing * 15, -5);
+            } else {
+                ctx.moveTo(0, -2);
+                ctx.lineTo(player.facing * 10, 5 + (player.grounded ? walkCycle : jumpStretch));
+                ctx.moveTo(0, -2);
+                ctx.lineTo(-player.facing * 10, 5 - (player.grounded ? walkCycle : jumpStretch));
+            }
+            ctx.stroke();
+            
+            // Legs
+            ctx.beginPath();
+            ctx.moveTo(0, 10);
+            ctx.lineTo(player.facing * (5 + (player.grounded ? walkCycle : 0)), 25 + (player.grounded ? 0 : jumpStretch));
+            ctx.moveTo(0, 10);
+            ctx.lineTo(-player.facing * (5 - (player.grounded ? walkCycle : 0)), 25 + (player.grounded ? 0 : jumpStretch));
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+
+            // Sword (Glowing Katana Style)
             if (player.isAttacking || player.isDashing || player.isCharging) {
                 ctx.save();
                 let angle = 0;
@@ -1034,17 +1101,38 @@
                 }
                 
                 ctx.rotate(player.facing === 1 ? angle : -angle);
-                ctx.strokeStyle = player.charge >= 60 ? '#fff' : varColor('--neon-cyan');
-                ctx.lineWidth = 4;
+                
+                const swordColor = player.charge >= 60 ? '#fff' : varColor('--neon-cyan');
+                const swordLen = 45;
+                
+                // Hilt
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 5;
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.lineTo(player.facing * 40, 0);
+                ctx.lineTo(player.facing * 8, 0);
                 ctx.stroke();
                 
-                // Sword Glow
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = ctx.strokeStyle;
+                // Blade Glow
+                ctx.strokeStyle = swordColor;
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = swordColor;
+                
+                ctx.beginPath();
+                ctx.moveTo(player.facing * 8, 0);
+                ctx.lineTo(player.facing * swordLen, 0);
                 ctx.stroke();
+                
+                // Blade Core
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.moveTo(player.facing * 10, 0);
+                ctx.lineTo(player.facing * (swordLen - 2), 0);
+                ctx.stroke();
+                
                 ctx.restore();
             }
             ctx.restore();

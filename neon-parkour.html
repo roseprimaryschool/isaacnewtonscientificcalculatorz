@@ -250,6 +250,13 @@
         let totalWaves = 3;
         let arenaActive = false;
         let waveTransition = false;
+        let showShop = false;
+        let shopItems = [
+            { name: 'REPAIR KIT', price: 50, desc: '+50 HP', action: () => { health = Math.min(100, health + 50); if(healthBar) healthBar.style.width = health + '%'; } },
+            { name: 'POWER CORE', price: 100, desc: 'FASTER CHARGE', action: () => { player.chargeSpeed = 2; } },
+            { name: 'SHIELD', price: 150, desc: 'REDUCE DAMAGE', action: () => { player.damageResist = 0.5; } }
+        ];
+        let coins_collected = 0;
 
         let stars = [];
         function initStars() {
@@ -390,8 +397,9 @@
 
             } else if (num === 4) {
                 // Sector 4 — Wave Fight Arena
-                showMsg("ARENA ENTERED - PREPARE FOR WAVES");
+                showMsg("ARENA ENTERED - PREPARE FOR BLADE RUNNERS");
                 currentWave = 1;
+                totalWaves = 2;
                 arenaActive = true;
                 // Large flat arena
                 platforms.push({ x: -500, y: curY, w: 2000, h: 150 });
@@ -461,20 +469,23 @@
         function spawnWave(waveNum) {
             enemies = [];
             waveTransition = false;
-            const count = 2 + waveNum * 2;
+            const count = waveNum === 1 ? 2 : 3;
             const arenaY = height - 150;
             for(let i = 0; i < count; i++) {
                 enemies.push({
                     x: -200 + Math.random() * 1400,
-                    y: arenaY - 40 - Math.random() * 200,
+                    y: arenaY - 40,
                     w: 30, h: 30,
-                    vx: 2 + Math.random() * 2,
+                    vx: 0,
                     platform: { x: -500, w: 2000 },
                     health: 1,
-                    type: 'drone'
+                    type: 'runner',
+                    state: 'idle',
+                    timer: 0,
+                    facing: 1
                 });
             }
-            showMsg("WAVE " + waveNum);
+            showMsg("WAVE " + waveNum + " - BLADE RUNNERS");
         }
 
         function resetPlayer() {
@@ -491,6 +502,8 @@
             player.charge = 0;
             player.isDashing = false;
             player.dashTimer = 0;
+            player.chargeSpeed = 1;
+            player.damageResist = 1.0;
             health = 100;
             if (healthBar) healthBar.style.width = '100%';
             if (chargeBar) chargeBar.style.width = '0%';
@@ -547,8 +560,28 @@
                     player.charge = 0;
                 }
             }
+            
+            // Shop Keys
+            if (showShop) {
+                if (e.key === '1') buyItem(0);
+                if (e.key === '2') buyItem(1);
+                if (e.key === '3') buyItem(2);
+            }
             keys[e.code] = true;
         });
+
+        function buyItem(idx) {
+            const item = shopItems[idx];
+            if (coins_collected >= item.price) {
+                coins_collected -= item.price;
+                item.action();
+                const coinVal = document.getElementById('coin-val');
+                if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
+                showMsg("PURCHASED: " + item.name);
+            } else {
+                showMsg("INSUFFICIENT COINS");
+            }
+        }
         window.addEventListener('keyup', e => {
             if (e.code === 'KeyJ' || e.code === 'KeyK' || e.code === 'KeyF') {
                 if (player.isCharging) {
@@ -645,7 +678,7 @@
         }
 
         function takeDamage(amt, sourceX) {
-            health -= amt;
+            health -= amt * (player.damageResist || 1.0);
             player.vy = -12;
             player.vx = (player.x < sourceX) ? -15 : 15;
             createParticles(player.x + player.w/2, player.y + player.h/2, varColor('--neon-pink'), 15);
@@ -662,7 +695,7 @@
 
             // Combat Logic
             if (player.isCharging) {
-                player.charge++;
+                player.charge += (player.chargeSpeed || 1);
                 if (chargeBar) chargeBar.style.width = Math.min(100, (player.charge / 60) * 100) + '%';
                 if (player.charge === 60) {
                     createParticles(player.x + player.w/2, player.y + player.h/2, '#fff', 10);
@@ -709,11 +742,21 @@
                         setTimeout(() => spawnWave(currentWave), 1500);
                     } else {
                         arenaActive = false;
-                        showMsg("ARENA CLEARED - PORTAL OPEN");
-                        platforms.push({ x: 500, y: height - 350, w: 200, h: 40, type: 'goal' });
+                        showMsg("ARENA CLEARED - SHOP OPEN");
+                        // Add shop platform
+                        platforms.push({ x: 1600, y: height - 150, w: 600, h: 40, type: 'shop' });
+                        platforms.push({ x: 2300, y: height - 150, w: 200, h: 40, type: 'goal' });
                     }
                 }
             }
+            
+            // Shop Interaction
+            showShop = false;
+            platforms.forEach(p => {
+                if (p.type === 'shop' && player.x + player.w > p.x && player.x < p.x + p.w && player.y + player.h > p.y && player.y < p.y + p.h) {
+                    showShop = true;
+                }
+            });
             
             player.x += player.vx;
             player.y += player.vy;
@@ -727,15 +770,73 @@
 
             // Update Enemies
             enemies.forEach(en => {
-                en.x += en.vx;
-                if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
-                    en.vx *= -1;
+                if (en.type === 'drone') {
+                    en.x += en.vx;
+                    if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
+                        en.vx *= -1;
+                    }
+                } else if (en.type === 'runner') {
+                    const distToPlayer = Math.abs(player.x - en.x);
+                    const sameLevel = Math.abs(player.y - en.y) < 100;
+
+                    if (en.state === 'idle') {
+                        en.timer++;
+                        if (en.timer > 30) {
+                            en.state = 'sprinting';
+                            en.timer = 0;
+                        }
+                    } else if (en.state === 'sprinting') {
+                        const dir = player.x < en.x ? -1 : 1;
+                        en.facing = dir;
+                        en.vx = dir * 5;
+                        en.x += en.vx;
+                        
+                        if (distToPlayer < 200 && sameLevel) {
+                            en.state = 'preparing';
+                            en.timer = 0;
+                            en.vx = 0;
+                        }
+                    } else if (en.state === 'preparing') {
+                        en.timer++;
+                        if (en.timer > 20) {
+                            en.state = 'dashing';
+                            en.timer = 0;
+                        }
+                    } else if (en.state === 'dashing') {
+                        en.vx = en.facing * 15;
+                        en.x += en.vx;
+                        en.timer++;
+                        if (en.timer > 15) {
+                            en.state = 'cooldown';
+                            en.timer = 0;
+                        }
+                    } else if (en.state === 'cooldown') {
+                        en.vx = 0;
+                        en.timer++;
+                        if (en.timer > 40) {
+                            en.state = 'idle';
+                            en.timer = 0;
+                        }
+                    }
+                    
+                    // Keep on platform
+                    if (en.x < en.platform.x) en.x = en.platform.x;
+                    if (en.x + en.w > en.platform.x + en.platform.w) en.x = en.platform.x + en.platform.w - en.w;
                 }
             });
 
             // Update Coins
             for (let i = coins.length - 1; i >= 0; i--) {
                 const c = coins[i];
+                const dx = (player.x + player.w/2) - c.x;
+                const dy = (player.y + player.h/2) - c.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 50) {
+                    coins_collected += 10;
+                    coins.splice(i, 1);
+                    if (document.getElementById('coin-val')) document.getElementById('coin-val').innerText = coins_collected;
+                }
+            }
                 c.y += Math.sin(frameCount * 0.1) * 0.5; // Floating animation
                 
                 const dx = (player.x + player.w/2) - c.x;
@@ -852,12 +953,19 @@
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     
                     if (dist < attackRange) {
-                        createParticles(en.x + en.w/2, en.y + en.h/2, varColor('--neon-cyan'), 15);
+                        const isDashHit = player.isDashing;
+                        const damage = isDashHit ? 2 : 1;
                         
-                        // Drop Coin
-                        coins.push({ x: en.x + en.w/2, y: en.y + en.h/2 });
+                        en.health -= damage;
+                        if (en.health <= 0) {
+                            createParticles(en.x + en.w/2, en.y + en.h/2, varColor('--neon-cyan'), 15);
+                            coins.push({ x: en.x + en.w/2, y: en.y + en.h/2 });
+                            enemies.splice(i, 1);
+                        } else {
+                            createParticles(en.x + en.w/2, en.y + en.h/2, '#fff', 5);
+                            en.vx = player.facing * 10; // Knockback
+                        }
                         
-                        enemies.splice(i, 1);
                         if (!player.isDashing) {
                             player.vx = -player.facing * 5; // Slight recoil
                         }
@@ -1034,6 +1142,19 @@
                     ctx.fillRect(p.x, p.y, p.w, p.h);
                     ctx.strokeRect(p.x, p.y, p.w, p.h);
                     ctx.globalAlpha = 1.0;
+                } else if (p.type === 'shop') {
+                    ctx.fillStyle = '#000';
+                    ctx.strokeStyle = varColor('--neon-pink');
+                    ctx.lineWidth = 3;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                    
+                    ctx.fillStyle = varColor('--neon-pink');
+                    ctx.font = 'bold 20px Orbitron';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('NEON SHOP', p.x + p.w/2, p.y - 40);
+                    ctx.font = '12px Orbitron';
+                    ctx.fillText('STAND HERE TO BROWSE', p.x + p.w/2, p.y - 20);
                 } else {
                     ctx.fillStyle = '#000';
                     ctx.strokeStyle = varColor('--neon-cyan');
@@ -1140,20 +1261,46 @@
 
             // Enemies
             enemies.forEach(en => {
-                ctx.fillStyle = '#000';
-                ctx.strokeStyle = varColor('--neon-pink');
-                ctx.lineWidth = 2;
-                ctx.strokeRect(en.x, en.y, en.w, en.h);
-                
-                // Eye
-                ctx.fillStyle = varColor('--neon-pink');
-                ctx.fillRect(en.x + (en.vx > 0 ? 20 : 5), en.y + 10, 5, 5);
-                
-                // Glow
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = varColor('--neon-pink');
-                ctx.strokeRect(en.x, en.y, en.w, en.h);
-                ctx.shadowBlur = 0;
+                if (en.type === 'drone') {
+                    ctx.fillStyle = '#000';
+                    ctx.strokeStyle = varColor('--neon-pink');
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(en.x, en.y, en.w, en.h);
+                    
+                    // Eye
+                    ctx.fillStyle = varColor('--neon-pink');
+                    ctx.fillRect(en.x + (en.vx > 0 ? 20 : 5), en.y + 10, 5, 5);
+                    
+                    // Glow
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = varColor('--neon-pink');
+                    ctx.strokeRect(en.x, en.y, en.w, en.h);
+                    ctx.shadowBlur = 0;
+                } else if (en.type === 'runner') {
+                    ctx.fillStyle = '#000';
+                    ctx.strokeStyle = varColor('--neon-pink');
+                    ctx.lineWidth = 2;
+                    ctx.fillRect(en.x, en.y, en.w, en.h);
+                    ctx.strokeRect(en.x, en.y, en.w, en.h);
+                    
+                    // Eyes/Glow
+                    ctx.fillStyle = varColor('--neon-pink');
+                    if (en.state === 'preparing') {
+                        ctx.globalAlpha = Math.sin(frameCount * 0.5) * 0.5 + 0.5;
+                        ctx.fillRect(en.x, en.y, en.w, en.h);
+                        ctx.globalAlpha = 1.0;
+                    }
+                    
+                    const eyeX = en.facing === 1 ? en.x + en.w - 10 : en.x + 2;
+                    ctx.fillRect(eyeX, en.y + 5, 8, 4);
+                    
+                    // Dash trail if dashing
+                    if (en.state === 'dashing') {
+                        ctx.globalAlpha = 0.3;
+                        ctx.fillRect(en.x - en.vx * 2, en.y, en.w, en.h);
+                        ctx.globalAlpha = 1.0;
+                    }
+                }
             });
 
             // Particles
@@ -1256,6 +1403,45 @@
             ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
             for(let i = 0; i < height; i += 4) {
                 ctx.fillRect(0, i, width, 2);
+            }
+
+            // Shop UI
+            if (showShop) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(width/2 - 200, height/2 - 150, 400, 300);
+                ctx.strokeStyle = varColor('--neon-pink');
+                ctx.lineWidth = 2;
+                ctx.strokeRect(width/2 - 200, height/2 - 150, 400, 300);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '20px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.fillText('NEON SHOP', width/2, height/2 - 110);
+                ctx.font = '14px Orbitron';
+                ctx.fillText(`COINS: ${coins_collected}`, width/2, height/2 - 85);
+                
+                shopItems.forEach((item, idx) => {
+                    const y = height/2 - 40 + idx * 60;
+                    ctx.fillStyle = coins_collected >= item.price ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+                    ctx.fillRect(width/2 - 180, y - 20, 360, 50);
+                    ctx.strokeStyle = coins_collected >= item.price ? varColor('--neon-cyan') : '#555';
+                    ctx.strokeRect(width/2 - 180, y - 20, 360, 50);
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'left';
+                    ctx.font = 'bold 14px Orbitron';
+                    ctx.fillText(item.name, width/2 - 170, y + 5);
+                    ctx.font = '10px Orbitron';
+                    ctx.fillText(item.desc, width/2 - 170, y + 20);
+                    
+                    ctx.textAlign = 'right';
+                    ctx.fillStyle = varColor('--neon-cyan');
+                    ctx.fillText(`${item.price}C`, width/2 + 170, y + 10);
+                    
+                    ctx.font = '8px Orbitron';
+                    ctx.fillStyle = '#888';
+                    ctx.fillText('PRESS 1, 2, or 3 TO BUY', width/2, height/2 + 135);
+                });
             }
         }
 

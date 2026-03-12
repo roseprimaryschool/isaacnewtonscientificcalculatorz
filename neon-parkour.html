@@ -113,6 +113,31 @@
             transition: width 0.1s;
         }
 
+        #shop-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--neon-pink);
+            color: #fff;
+            border: 2px solid #000;
+            padding: 10px 20px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            cursor: pointer;
+            display: none;
+            z-index: 100;
+            box-shadow: 4px 4px 0px #000;
+            text-transform: uppercase;
+        }
+        #shop-btn:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px #000;
+        }
+        #shop-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px #000;
+        }
+
         /* Mobile Controls - Sharp Brutalist Style */
         #mobile-controls {
             position: absolute;
@@ -164,7 +189,7 @@
 </head>
 <body>
     <div id="ui">
-        <div class="stat-box">
+        <div class="stat-box" id="sector-box">
             <div class="label">SECTOR</div>
             <div class="value">0<span id="sector-val">1</span></div>
             <div class="health-bar-container">
@@ -179,6 +204,7 @@
     </div>
     
     <div id="message">SECTOR CLEAR</div>
+    <button id="shop-btn">NEON SHOP</button>
 
     <div id="mobile-controls">
         <div class="control-group">
@@ -201,6 +227,28 @@
         const chargeBar = document.getElementById('charge-bar');
         const coinVal = document.getElementById('coin-val');
         const message = document.getElementById('message');
+        const shopBtn = document.getElementById('shop-btn');
+        const sectorBox = document.getElementById('sector-box');
+        const mobileControls = document.getElementById('mobile-controls');
+
+        function toggleShop() {
+            showShop = !showShop;
+            if (showShop) {
+                if (sectorBox) sectorBox.style.display = 'none';
+                if (mobileControls) mobileControls.style.display = 'none';
+                if (shopBtn) shopBtn.innerText = 'CLOSE SHOP';
+            } else {
+                if (sectorBox) sectorBox.style.display = 'block';
+                if (shopBtn) shopBtn.innerText = 'NEON SHOP';
+                if (mobileControls && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+                    mobileControls.style.display = 'flex';
+                }
+            }
+        }
+
+        if (shopBtn) {
+            shopBtn.addEventListener('click', toggleShop);
+        }
 
         if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
             document.body.classList.add('is-touch');
@@ -249,6 +297,7 @@
         let currentWave = 0;
         let totalWaves = 3;
         let arenaActive = false;
+        let arenaCleared = false;
         let waveTransition = false;
         let showShop = false;
         let shopItems = [
@@ -401,11 +450,12 @@
                 currentWave = 1;
                 totalWaves = 2;
                 arenaActive = true;
+                arenaCleared = false;
                 // Large flat arena
                 platforms.push({ x: -500, y: curY, w: 2000, h: 150 });
                 // Walls
-                platforms.push({ x: -540, y: curY - 800, w: 40, h: 800 });
-                platforms.push({ x: 1500, y: curY - 800, w: 40, h: 800 });
+                platforms.push({ x: -540, y: curY - 800, w: 40, h: 800, isWall: true });
+                platforms.push({ x: 1500, y: curY - 800, w: 40, h: 800, isWall: true });
                 
                 spawnWave(currentWave);
             } else {
@@ -481,7 +531,7 @@
                     health: 1,
                     type: 'runner',
                     state: 'idle',
-                    timer: 0,
+                    timer: -90, // Cooldown on spawn
                     facing: 1
                 });
             }
@@ -512,6 +562,7 @@
             if (sector === 4) {
                 currentWave = 1;
                 arenaActive = true;
+                arenaCleared = false;
                 waveTransition = false;
                 spawnWave(currentWave);
             }
@@ -742,21 +793,23 @@
                         setTimeout(() => spawnWave(currentWave), 1500);
                     } else {
                         arenaActive = false;
+                        arenaCleared = true;
                         showMsg("ARENA CLEARED - SHOP OPEN");
-                        // Add shop platform
-                        platforms.push({ x: 1600, y: height - 150, w: 600, h: 40, type: 'shop' });
+                        // Remove walls
+                        platforms = platforms.filter(p => !p.isWall);
+                        // Add goal platform
                         platforms.push({ x: 2300, y: height - 150, w: 200, h: 40, type: 'goal' });
                     }
                 }
             }
             
             // Shop Interaction
-            showShop = false;
-            platforms.forEach(p => {
-                if (p.type === 'shop' && player.x + player.w > p.x && player.x < p.x + p.w && player.y + player.h > p.y && player.y < p.y + p.h) {
-                    showShop = true;
-                }
-            });
+            if (sector === 4 && arenaCleared) {
+                if (shopBtn) shopBtn.style.display = 'block';
+            } else {
+                if (shopBtn) shopBtn.style.display = 'none';
+                showShop = false;
+            }
             
             player.x += player.vx;
             player.y += player.vy;
@@ -798,7 +851,7 @@
                         }
                     } else if (en.state === 'preparing') {
                         en.timer++;
-                        if (en.timer > 20) {
+                        if (en.timer > 35) {
                             en.state = 'dashing';
                             en.timer = 0;
                         }
@@ -938,12 +991,15 @@
                 const en = enemies[i];
                 // Player hits enemy
                 if (player.isAttacking || player.isDashing) {
-                    const attackRange = player.isDashing ? 60 : 50;
+                    const attackRange = player.isDashing ? 80 : 70;
                     const dx = (player.x + player.w/2) - (en.x + en.w/2);
                     const dy = (player.y + player.h/2) - (en.y + en.h/2);
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     
-                    if (dist < attackRange) {
+                    // More forgiving hitbox for drones
+                    const hitRange = en.type === 'drone' ? attackRange + 20 : attackRange;
+                    
+                    if (dist < hitRange) {
                         const isDashHit = player.isDashing;
                         const damage = isDashHit ? 2 : 1;
                         
@@ -968,7 +1024,11 @@
                 if (player.x + player.w > en.x && player.x < en.x + en.w &&
                     player.y + player.h > en.y && player.y < en.y + en.h) {
                     if (!player.isDashing) {
-                        takeDamage(20, en.x);
+                        if (en.type === 'drone') {
+                            takeDamage(10, en.x);
+                        } else if (en.type === 'runner' && en.state === 'dashing') {
+                            takeDamage(10, en.x);
+                        }
                     }
                 }
             }

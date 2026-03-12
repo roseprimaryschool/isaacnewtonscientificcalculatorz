@@ -1131,8 +1131,8 @@
             ctx.shadowColor = stickColor;
 
             // Animation logic
-            const walkCycle = isMoving && player.grounded ? Math.sin(frameCount * 0.25) : 0;
-            const runCycle = isMoving && player.grounded ? frameCount * 0.25 : 0;
+            const walkCycle = isMoving && player.grounded ? Math.sin(frameCount * 0.2) : 0;
+            const runCycle = isMoving && player.grounded ? frameCount * 0.2 : 0;
             
             // Head
             ctx.beginPath();
@@ -1147,81 +1147,99 @@
             
             let handX = 0, handY = 0;
 
-            // Arms
+            // Arms with Elbows
             ctx.beginPath();
             if (player.isAttacking) {
                 // Attacking pose
                 handX = player.facing * 30;
-                handY = -15;
+                handY = -5;
+                // Front arm
                 ctx.moveTo(0, -8);
+                ctx.lineTo(player.facing * 15, -10);
                 ctx.lineTo(handX, handY);
+                // Back arm
                 ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 15, 5);
+                ctx.lineTo(-player.facing * 10, 0);
+                ctx.lineTo(-player.facing * 20, 10);
             } else if (!player.grounded) {
-                // Jumping pose: Athletic forward reach
-                handX = player.facing * 20;
-                handY = -25;
+                // Jumping pose: Arms extended backwards, knees bent
+                handX = -player.facing * 25;
+                handY = 5;
+                // Arm 1
                 ctx.moveTo(0, -8);
+                ctx.lineTo(-player.facing * 15, -5);
                 ctx.lineTo(handX, handY);
+                // Arm 2
                 ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 10, -20);
+                ctx.lineTo(-player.facing * 10, 0);
+                ctx.lineTo(-player.facing * 20, 15);
             } else if (isMoving) {
-                // Running pose: Pumping arms
-                const armSwing = Math.sin(runCycle);
-                handX = player.facing * 20 * armSwing;
-                handY = 10;
+                // Running pose: Dynamic scissor swing
+                const swing = Math.sin(runCycle);
+                handX = player.facing * swing * 25;
+                handY = 5;
+                // Front arm
                 ctx.moveTo(0, -8);
+                ctx.lineTo(player.facing * swing * 15, 0);
                 ctx.lineTo(handX, handY);
+                // Back arm
+                const bSwing = Math.sin(runCycle + Math.PI);
                 ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 20 * armSwing, 10);
+                ctx.lineTo(player.facing * bSwing * 15, 0);
+                ctx.lineTo(player.facing * bSwing * 25, 5);
             } else {
                 // Idle pose
-                handX = player.facing * 12;
+                handX = player.facing * 10;
                 handY = 12;
                 ctx.moveTo(0, -8);
+                ctx.lineTo(player.facing * 5, 5);
                 ctx.lineTo(handX, handY);
                 ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 12, 12);
+                ctx.lineTo(-player.facing * 5, 5);
+                ctx.lineTo(-player.facing * 10, 12);
             }
             ctx.stroke();
             
-            // Legs with Knees
+            // Legs with Knees (Natural Scissor Motion)
             ctx.beginPath();
             if (!player.grounded) {
-                // Jumping legs: One tucked, one trailing
-                const jumpProgress = Math.min(1, Math.abs(player.vy) / 15);
-                // Front leg
+                // Jumping legs: Knees bent
+                // Leg 1
                 ctx.moveTo(0, 12);
-                ctx.lineTo(player.facing * 10, 20);
-                ctx.lineTo(player.facing * 15, 25);
-                // Back leg
+                ctx.lineTo(player.facing * 10, 25);
+                ctx.lineTo(player.facing * 5, 35);
+                // Leg 2
                 ctx.moveTo(0, 12);
-                ctx.lineTo(-player.facing * 15, 20);
-                ctx.lineTo(-player.facing * 20, 30);
+                ctx.lineTo(-player.facing * 10, 20);
+                ctx.lineTo(-player.facing * 15, 30);
             } else if (isMoving) {
-                // Running legs: Cycling with knees
-                const legCycle1 = runCycle;
-                const legCycle2 = runCycle + Math.PI;
+                // Running legs: Dynamic scissor motion
+                const s1 = Math.sin(runCycle);
+                const s2 = Math.sin(runCycle + Math.PI);
                 
-                const drawLeg = (cycle) => {
-                    const kneeX = player.facing * Math.sin(cycle) * 15;
-                    const kneeY = 25 + Math.cos(cycle) * 5;
-                    const footX = player.facing * Math.sin(cycle - 0.5) * 20;
-                    const footY = 30 + Math.cos(cycle - 0.5) * 5;
+                const drawLeg = (s) => {
+                    const tx = player.facing * s * 18;
+                    const ty = 28;
+                    const sx = tx + player.facing * (s > 0 ? 8 : -8);
+                    const sy = 40;
                     ctx.moveTo(0, 12);
-                    ctx.lineTo(kneeX, kneeY);
-                    ctx.lineTo(footX, footY);
+                    ctx.lineTo(tx, ty);
+                    ctx.lineTo(sx, sy);
                 };
-                drawLeg(legCycle1);
-                drawLeg(legCycle2);
+                drawLeg(s1);
+                drawLeg(s2);
             } else {
                 // Idle legs
                 ctx.moveTo(0, 12);
-                ctx.lineTo(8, 30);
+                ctx.lineTo(5, 25);
+                ctx.lineTo(8, 40);
                 ctx.moveTo(0, 12);
-                ctx.lineTo(-8, 30);
+                ctx.lineTo(-5, 25);
+                ctx.lineTo(-8, 40);
             }
             ctx.stroke();
+
+            ctx.strokeStyle = stickColor; // Reset
 
             ctx.shadowBlur = 0;
 

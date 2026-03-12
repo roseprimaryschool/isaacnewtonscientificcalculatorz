@@ -248,22 +248,30 @@
 
         function initBuildings() {
             buildings = [];
-            const colors = ['#00f2ff', '#ff0055', '#00ff00', '#ffff00', '#ff00ff'];
-            for(let i = 0; i < 40; i++) {
+            // Palette: Purple, Dark Blue, Cyan
+            const colors = ['#8b5cf6', '#1e1b4b', '#00f2ff'];
+            for(let i = 0; i < 80; i++) {
+                const parallax = 0.01 + Math.random() * 0.18;
+                const buildingWidth = 40 + Math.random() * 120;
                 buildings.push({
                     x: Math.random() * 5000,
-                    y: height - (300 + Math.random() * 600),
-                    w: 120 + Math.random() * 200,
+                    y: height - (100 + Math.random() * 500),
+                    w: buildingWidth,
                     h: 2000,
-                    parallax: 0.05 + Math.random() * 0.2,
+                    parallax: parallax,
                     color: colors[Math.floor(Math.random() * colors.length)],
-                    windows: Array.from({length: 15}, () => ({
+                    // Structured windows
+                    windows: Array.from({length: 40}, () => ({
                         x: 0.1 + Math.random() * 0.8,
-                        y: 0.05 + Math.random() * 0.9,
-                        w: 0.05 + Math.random() * 0.1,
-                        h: 0.02 + Math.random() * 0.03,
-                        on: Math.random() > 0.3
-                    }))
+                        y: 0.01 + Math.random() * 0.9,
+                        w: 0.1,
+                        h: 0.006,
+                        on: Math.random() > 0.4
+                    })),
+                    hasAntenna: Math.random() > 0.4,
+                    antennaHeight: 40 + Math.random() * 80,
+                    glowIntensity: 0.3 + Math.random() * 0.5,
+                    hasSign: Math.random() > 0.8
                 });
             }
         }
@@ -809,15 +817,15 @@
         }
 
         function draw() {
-            // Background Gradient
+            // Background Gradient: Dark Blue to Purple
             const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-            bgGrad.addColorStop(0, '#050508');
-            bgGrad.addColorStop(0.7, '#0a0a15');
-            bgGrad.addColorStop(1, '#1a0a1a');
+            bgGrad.addColorStop(0, '#020205');
+            bgGrad.addColorStop(0.6, '#05051a');
+            bgGrad.addColorStop(1, '#1a0525');
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, width, height);
             
-            ctx.strokeStyle = varColor('--grid-line');
+            ctx.strokeStyle = 'rgba(0, 242, 255, 0.03)';
             ctx.lineWidth = 1;
             const gridSize = 60;
             const offsetX = cameraX % gridSize;
@@ -838,18 +846,59 @@
                 const drawX = bx < -b.w ? bx + 5000 : bx;
                 const drawY = b.y + cameraY * b.parallax;
                 
-                // Building Outline
+                // Building Body (Deep Black Silhouette)
+                ctx.fillStyle = '#000005';
+                ctx.fillRect(drawX, drawY, b.w, b.h);
+
+                // Building Outline (Vibrant Neon)
                 ctx.strokeStyle = b.color;
-                ctx.globalAlpha = 0.1 + b.parallax * 0.3;
-                ctx.lineWidth = 2;
+                ctx.globalAlpha = b.glowIntensity;
+                ctx.lineWidth = 1.5;
+                
+                // Main Outline
                 ctx.strokeRect(drawX, drawY, b.w, b.h);
                 
+                // Neon Glow Layer
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = b.color;
+                ctx.strokeRect(drawX, drawY, b.w, b.h);
+                ctx.shadowBlur = 0;
+
+                // Antenna
+                if (b.hasAntenna) {
+                    ctx.beginPath();
+                    ctx.moveTo(drawX + b.w/2, drawY);
+                    ctx.lineTo(drawX + b.w/2, drawY - b.antennaHeight);
+                    ctx.stroke();
+                    // Tip glow
+                    if (frameCount % 30 < 15) {
+                        ctx.fillStyle = b.color;
+                        ctx.shadowBlur = 25;
+                        ctx.shadowColor = b.color;
+                        ctx.beginPath();
+                        ctx.arc(drawX + b.w/2, drawY - b.antennaHeight, 5, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+                }
+
+                // Neon Sign (Billboard)
+                if (b.hasSign) {
+                    ctx.fillStyle = b.color;
+                    ctx.globalAlpha = 0.6;
+                    ctx.fillRect(drawX + 10, drawY + 20, b.w - 20, 40);
+                    ctx.globalAlpha = 1.0;
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(drawX + 10, drawY + 20, b.w - 20, 40);
+                }
+
                 // Windows
                 ctx.fillStyle = b.color;
                 b.windows.forEach(w => {
                     if (w.on) {
-                        ctx.globalAlpha = 0.2 + b.parallax * 0.4;
-                        ctx.fillRect(drawX + w.x * b.w, drawY + w.y * 800, w.w * b.w, w.h * 800);
+                        ctx.globalAlpha = 0.5 + b.parallax * 0.4;
+                        ctx.fillRect(drawX + w.x * b.w, drawY + w.y * 1800, w.w * b.w, w.h * 1800);
                     }
                 });
                 ctx.globalAlpha = 1.0;
@@ -1034,66 +1083,98 @@
             
             // Dash trail
             if (player.isDashing) {
-                ctx.globalAlpha = 0.3;
-                ctx.fillStyle = varColor('--neon-cyan');
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = '#00f2ff';
                 ctx.beginPath();
-                ctx.arc(-player.w * player.facing, 0, 15, 0, Math.PI * 2);
+                ctx.arc(-player.w * player.facing, 0, 20, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
             }
 
             const stickColor = '#fff';
             ctx.strokeStyle = stickColor;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 5;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 20;
             ctx.shadowColor = stickColor;
 
-            // Animation values
-            const walkCycle = Math.sin(frameCount * 0.2) * 10;
-            const jumpStretch = Math.min(10, Math.abs(player.vy));
+            // Animation logic
+            const isMoving = Math.abs(player.vx) > 0.8;
+            const walkCycle = isMoving && player.grounded ? Math.sin(frameCount * 0.3) : 0;
             
             // Head
             ctx.beginPath();
-            ctx.arc(0, -15, 8, 0, Math.PI * 2);
+            ctx.arc(0, -25, 10, 0, Math.PI * 2);
             ctx.stroke();
             
             // Body
             ctx.beginPath();
-            ctx.moveTo(0, -7);
-            ctx.lineTo(0, 10);
+            ctx.moveTo(0, -15);
+            ctx.lineTo(0, 15);
             ctx.stroke();
             
             // Arms
             ctx.beginPath();
             if (player.isAttacking) {
-                // Attacking arm
-                ctx.moveTo(0, -2);
-                ctx.lineTo(player.facing * 15, -5);
+                // Attacking pose: Sword arm extended, other arm back
+                ctx.moveTo(0, -10);
+                ctx.lineTo(player.facing * 30, -15);
+                ctx.moveTo(0, -10);
+                ctx.lineTo(-player.facing * 15, 5);
+            } else if (!player.grounded) {
+                // Jumping pose: Arms up and out
+                ctx.moveTo(0, -10);
+                ctx.lineTo(player.facing * 25, -30);
+                ctx.moveTo(0, -10);
+                ctx.lineTo(-player.facing * 25, -30);
+            } else if (isMoving) {
+                // Running pose: Arms swinging wide
+                ctx.moveTo(0, -10);
+                ctx.lineTo(player.facing * 25 * walkCycle, 10);
+                ctx.moveTo(0, -10);
+                ctx.lineTo(-player.facing * 25 * walkCycle, 10);
             } else {
-                ctx.moveTo(0, -2);
-                ctx.lineTo(player.facing * 10, 5 + (player.grounded ? walkCycle : jumpStretch));
-                ctx.moveTo(0, -2);
-                ctx.lineTo(-player.facing * 10, 5 - (player.grounded ? walkCycle : jumpStretch));
+                // Idle pose: Arms relaxed at sides (Static)
+                ctx.moveTo(0, -10);
+                ctx.lineTo(player.facing * 15, 15);
+                ctx.moveTo(0, -10);
+                ctx.lineTo(-player.facing * 15, 15);
             }
             ctx.stroke();
             
             // Legs
             ctx.beginPath();
-            ctx.moveTo(0, 10);
-            ctx.lineTo(player.facing * (5 + (player.grounded ? walkCycle : 0)), 25 + (player.grounded ? 0 : jumpStretch));
-            ctx.moveTo(0, 10);
-            ctx.lineTo(-player.facing * (5 - (player.grounded ? walkCycle : 0)), 25 + (player.grounded ? 0 : jumpStretch));
+            if (!player.grounded) {
+                // Jumping legs: Tucked up (Dynamic)
+                const tuck = Math.min(10, Math.abs(player.vy));
+                ctx.moveTo(0, 15);
+                ctx.lineTo(player.facing * 20, 25 - tuck);
+                ctx.moveTo(0, 15);
+                ctx.lineTo(-player.facing * 15, 30 - tuck);
+            } else if (isMoving) {
+                // Running legs: Cycling motion (Dynamic)
+                const legSwing = Math.cos(frameCount * 0.3);
+                ctx.moveTo(0, 15);
+                ctx.lineTo(player.facing * 25 * legSwing, 40);
+                ctx.moveTo(0, 15);
+                ctx.lineTo(-player.facing * 25 * legSwing, 40);
+            } else {
+                // Idle legs: Standing still (Static)
+                ctx.moveTo(0, 15);
+                ctx.lineTo(10, 40);
+                ctx.moveTo(0, 15);
+                ctx.lineTo(-10, 40);
+            }
             ctx.stroke();
 
             ctx.shadowBlur = 0;
 
-            // Sword (Glowing Katana Style)
+            // Sword (Actual Sword Shape)
             if (player.isAttacking || player.isDashing || player.isCharging) {
                 ctx.save();
                 let angle = 0;
                 if (player.isCharging) {
-                    angle = -Math.PI / 4;
+                    angle = -Math.PI / 10;
                 } else if (player.isAttacking) {
                     angle = (1 - player.attackTimer / 15) * Math.PI;
                 } else if (player.isDashing) {
@@ -1102,35 +1183,47 @@
                 
                 ctx.rotate(player.facing === 1 ? angle : -angle);
                 
-                const swordColor = player.charge >= 60 ? '#fff' : varColor('--neon-cyan');
-                const swordLen = 45;
+                const swordColor = player.charge >= 60 ? '#fff' : '#00f2ff';
+                const swordLen = 70;
                 
-                // Hilt
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 5;
+                // Handle (Tsuka)
+                ctx.strokeStyle = '#111';
+                ctx.lineWidth = 8;
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.lineTo(player.facing * 8, 0);
+                ctx.lineTo(player.facing * -20, 0);
                 ctx.stroke();
+
+                // Guard (Tsuba)
+                ctx.fillStyle = '#333';
+                ctx.fillRect(player.facing * -5, -12, 10, 24);
                 
-                // Blade Glow
-                ctx.strokeStyle = swordColor;
-                ctx.lineWidth = 4;
-                ctx.shadowBlur = 20;
+                // Blade (Physical Shape with Gradient)
+                const bladeGrad = ctx.createLinearGradient(0, -5, 0, 5);
+                bladeGrad.addColorStop(0, swordColor);
+                bladeGrad.addColorStop(0.5, '#fff');
+                bladeGrad.addColorStop(1, swordColor);
+                
+                ctx.fillStyle = bladeGrad;
+                ctx.shadowBlur = 40;
                 ctx.shadowColor = swordColor;
                 
                 ctx.beginPath();
-                ctx.moveTo(player.facing * 8, 0);
-                ctx.lineTo(player.facing * swordLen, 0);
-                ctx.stroke();
+                ctx.moveTo(0, -5);
+                ctx.lineTo(player.facing * (swordLen - 15), -5);
+                ctx.lineTo(player.facing * swordLen, 0); // Pointy tip
+                ctx.lineTo(player.facing * (swordLen - 15), 5);
+                ctx.lineTo(0, 5);
+                ctx.closePath();
+                ctx.fill();
                 
-                // Blade Core
+                // Blade Edge (Sharp Highlight)
                 ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 2;
                 ctx.shadowBlur = 0;
                 ctx.beginPath();
-                ctx.moveTo(player.facing * 10, 0);
-                ctx.lineTo(player.facing * (swordLen - 2), 0);
+                ctx.moveTo(player.facing * 5, -2);
+                ctx.lineTo(player.facing * (swordLen - 10), -2);
                 ctx.stroke();
                 
                 ctx.restore();

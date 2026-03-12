@@ -219,7 +219,7 @@
         const JUMP_FORCE = -12.5;
         const MOVE_SPEED = 7;
         const PLAYER_SIZE_W = 30;
-        const PLAYER_SIZE_H = 60;
+        const PLAYER_SIZE_H = 30;
 
         // Game State
         let sector = 1;
@@ -246,6 +246,10 @@
         let frameCount = 0;
         let transitionAlpha = 0;
         let isTransitioning = false;
+        let currentWave = 0;
+        let totalWaves = 3;
+        let arenaActive = false;
+        let waveTransition = false;
 
         let stars = [];
         function initStars() {
@@ -298,141 +302,179 @@
             saws = [];
             enemies = [];
             coins = [];
+            arenaActive = false;
+            waveTransition = false;
             
             let curX = 0;
             let curY = height - 150;
 
-            // Starting platform
-            platforms.push({ x: -200, y: curY, w: 600, h: 150 });
-            curX = 400;
+            if (num === 1) {
+                // Level 1 — Movement Basics and Safe Obstacles
+                // Starting platform
+                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
+                curX = 400;
 
-            // Generate horizontal stretch
-            const sectorLength = 10 + num * 2;
-            for(let i = 0; i < sectorLength; i++) {
-                const gap = 130 + Math.random() * 120;
-                const w = 150 + Math.random() * 300;
+                // Straightforward layout with small jumps
+                platforms.push({ x: 600, y: curY, w: 200, h: 40 });
+                platforms.push({ x: 900, y: curY - 50, w: 200, h: 40 });
+
+                // Introduce double jump with a clear gap
+                platforms.push({ x: 1400, y: curY, w: 300, h: 40 }); // Gap of 300
+
+                // First obstacle: stationary spikes in obvious spots
+                platforms.push({ x: 1900, y: curY, w: 400, h: 40 });
+                spikes.push({ x: 2050, y: curY - 15, w: 100, h: 15 });
+
+                // One simple drone at the end to teach short-tap attack
+                platforms.push({ x: 2500, y: curY, w: 500, h: 40 });
+                enemies.push({
+                    x: 2750, y: curY - 40, w: 30, h: 30, vx: 0,
+                    platform: { x: 2500, w: 500 }, health: 1, type: 'drone'
+                });
+
+                // Goal
+                platforms.push({ x: 3200, y: curY, w: 200, h: 40, type: 'goal' });
+
+            } else if (num === 2) {
+                // Level 2 — Timing Introduced (Lasers + Simple Combat)
+                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
+                curX = 400;
+
+                // Introduce lasers with slow cycles
+                platforms.push({ x: 700, y: curY, w: 300, h: 40 });
+                lasers.push({ x: 850, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 180 });
+
+                // Slightly longer gaps and vertical jumps
+                platforms.push({ x: 1200, y: curY - 100, w: 200, h: 40 });
+                platforms.push({ x: 1500, y: curY - 250, w: 200, h: 40 });
+
+                // Two drones spaced apart
+                platforms.push({ x: 1900, y: curY - 100, w: 400, h: 40 });
+                enemies.push({ x: 2000, y: curY - 140, w: 30, h: 30, vx: 2, platform: { x: 1900, w: 400 }, health: 1, type: 'drone' });
                 
-                // Gap spikes - only if gap is large enough and not too deep
-                if (Math.random() > 0.4) {
-                    spikes.push({ x: curX, y: curY + 150, w: gap, h: 20 });
-                }
+                platforms.push({ x: 2500, y: curY - 150, w: 400, h: 40 });
+                enemies.push({ x: 2700, y: curY - 190, w: 30, h: 30, vx: 2, platform: { x: 2500, w: 400 }, health: 1, type: 'drone' });
 
-                curX += gap;
+                // Section where player must wait for laser cycle
+                platforms.push({ x: 3100, y: curY, w: 600, h: 40 });
+                lasers.push({ x: 3300, y: curY - 300, w: 16, h: 300, state: 'off', timer: 60, cycle: 180 });
+                lasers.push({ x: 3500, y: curY - 300, w: 16, h: 300, state: 'off', timer: 120, cycle: 180 });
+
+                // Goal
+                platforms.push({ x: 3900, y: curY, w: 200, h: 40, type: 'goal' });
+
+            } else if (num === 3) {
+                // Level 3 — First Real Flow Level
+                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
+                curX = 400;
+
+                // Faster laser cycles
+                platforms.push({ x: 700, y: curY, w: 300, h: 40 });
+                lasers.push({ x: 850, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 100 });
+
+                // Moving platforms for vertical control
+                platforms.push({ x: 1200, y: curY, w: 200, h: 40, type: 'moving', startY: curY, range: 200, speed: 0.03 });
                 
-                const dy = (Math.random() - 0.5) * 120;
-                curY += dy;
-                curY = Math.max(height * 0.2, Math.min(height * 0.85, curY));
+                platforms.push({ x: 1600, y: curY - 200, w: 300, h: 40 });
+                spikes.push({ x: 1700, y: curY - 215, w: 100, h: 15 });
 
-                // Platform types
-                let type = 'normal';
-                let extra = {};
-                // Moving platforms from Sector 4+
-                if (num >= 4 && Math.random() > 0.5) {
-                    type = 'moving';
-                    extra = { startY: curY, range: 150, speed: 0.02 + Math.random() * 0.02 };
-                } 
-                // Fading platforms from Sector 5+
-                else if (num >= 5 && Math.random() > 0.6) {
-                    type = 'fading';
-                    extra = { opacity: 1 };
-                }
+                platforms.push({ x: 2100, y: curY - 100, w: 200, h: 40, type: 'moving', startY: curY - 100, range: 150, speed: 0.05 });
 
-                // Instead of one long platform, sometimes create "stepping stones"
-                if (num >= 2 && Math.random() > 0.4 && type === 'normal') {
-                    const stoneCount = 2 + Math.floor(Math.random() * 2);
-                    const stoneW = 60 + Math.random() * 40; // Slightly wider stones
-                    const totalStonesW = stoneCount * stoneW;
-                    const stoneGap = (w - totalStonesW) / (stoneCount - 1);
-                    
-                    for(let s = 0; s < stoneCount; s++) {
-                        const sx = curX + s * (stoneW + stoneGap);
-                        const sy = curY + (Math.random() - 0.5) * 60;
-                        platforms.push({ x: sx, y: sy, w: stoneW, h: 30, type: 'normal' });
-                        
-                        // Spikes on stepping stones: only from Sector 4+, and never on the first stone
-                        if (num >= 4 && s > 0 && Math.random() > 0.85) {
-                            const sw = stoneW * 0.4; // Spike only covers 40% of the stone
-                            spikes.push({ x: sx + (stoneW - sw)/2, y: sy - 15, w: sw, h: 15 });
-                        }
+                // Mix of everything
+                platforms.push({ x: 2500, y: curY - 250, w: 400, h: 40 });
+                lasers.push({ x: 2700, y: curY - 550, w: 16, h: 300, state: 'off', timer: 30, cycle: 90 });
+                enemies.push({ x: 2600, y: curY - 290, w: 30, h: 30, vx: 3, platform: { x: 2500, w: 400 }, health: 1, type: 'drone' });
+
+                // Goal
+                platforms.push({ x: 3200, y: curY - 250, w: 200, h: 40, type: 'goal' });
+
+            } else if (num === 4) {
+                // Sector 4 — Wave Fight Arena
+                showMsg("ARENA ENTERED - PREPARE FOR WAVES");
+                currentWave = 1;
+                arenaActive = true;
+                // Large flat arena
+                platforms.push({ x: -500, y: curY, w: 2000, h: 150 });
+                // Walls
+                platforms.push({ x: -540, y: curY - 800, w: 40, h: 800 });
+                platforms.push({ x: 1500, y: curY - 800, w: 40, h: 800 });
+                
+                spawnWave(currentWave);
+            } else {
+                // Procedural for Sector 5+
+                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
+                curX = 400;
+                const sectorLength = 10 + num * 2;
+                for(let i = 0; i < sectorLength; i++) {
+                    const gap = 130 + Math.random() * 120;
+                    const w = 150 + Math.random() * 300;
+                    if (Math.random() > 0.4) spikes.push({ x: curX, y: curY + 150, w: gap, h: 20 });
+                    curX += gap;
+                    const dy = (Math.random() - 0.5) * 120;
+                    curY += dy;
+                    curY = Math.max(height * 0.2, Math.min(height * 0.85, curY));
+
+                    let type = 'normal';
+                    let extra = {};
+                    if (num >= 4 && Math.random() > 0.5) {
+                        type = 'moving';
+                        extra = { startY: curY, range: 150, speed: 0.02 + Math.random() * 0.02 };
+                    } else if (num >= 5 && Math.random() > 0.6) {
+                        type = 'fading';
+                        extra = { opacity: 1 };
                     }
-                } else {
+
                     platforms.push({ x: curX, y: curY, w: w, h: 40, type, ...extra });
-                    
-                    // Spikes on flat platforms: ensure at least 100px of safe space
                     if (Math.random() > (num >= 3 ? 0.4 : 0.6) && type === 'normal') {
                         const maxSpikeW = Math.max(20, w - 120);
                         const spikeW = 30 + Math.random() * maxSpikeW;
-                        // Place spike at the end, but leave room
                         spikes.push({ x: curX + w - spikeW - 10, y: curY - 15, w: spikeW, h: 15 });
                     }
+                    if (num >= 6 && Math.random() > 0.6) {
+                        saws.push({ x: curX + w/2, y: curY - 100, r: 30, angle: 0, speed: 0.05, range: 100, startX: curX + w/2 });
+                    }
+                    if (num >= 4 && Math.random() > 0.7) {
+                        crushers.push({ x: curX + w/2 - 40, y: curY - 400, w: 80, h: 100, startY: curY - 400, targetY: curY - 80, state: 'waiting', timer: Math.random() * 60 });
+                    }
+                    if (num >= 3 && Math.random() > 0.3) {
+                        enemies.push({ x: curX + w/2, y: curY - 40, w: 30, h: 30, vx: num >= 4 ? 3 : 2, platform: { x: curX, w: w }, health: 1, type: 'drone' });
+                    }
+                    if (num >= 2 && Math.random() > (num >= 3 ? 0.4 : 0.6)) {
+                        lasers.push({ x: curX + 10, y: curY - 300, w: 12, h: 300, state: 'off', timer: Math.random() * 120, cycle: 120 });
+                    }
+                    curX += w;
                 }
-
-                // New Obstacle: Saw (Sectors 6+)
-                if (num >= 6 && Math.random() > 0.6) {
-                    saws.push({
-                        x: curX + w/2,
-                        y: curY - 100,
-                        r: 30,
-                        angle: 0,
-                        speed: 0.05,
-                        range: 100,
-                        startX: curX + w/2
-                    });
-                }
-
-                // Crusher (Sectors 4+)
-                if (num >= 4 && Math.random() > 0.7) {
-                    crushers.push({
-                        x: curX + w/2 - 40,
-                        y: curY - 400,
-                        w: 80,
-                        h: 100,
-                        startY: curY - 400,
-                        targetY: curY - 80,
-                        state: 'waiting',
-                        timer: Math.random() * 60
-                    });
-                }
-
-                // Enemies (Sectors 3+)
-                if (num >= 3 && Math.random() > 0.3) {
-                    enemies.push({
-                        x: curX + w/2,
-                        y: curY - 40,
-                        w: 30,
-                        h: 30,
-                        vx: num >= 4 ? 3 : 2,
-                        platform: { x: curX, w: w },
-                        health: 1,
-                        type: 'drone'
-                    });
-                }
-
-                // Lasers (Sectors 2+)
-                if (num >= 2 && Math.random() > (num >= 3 ? 0.4 : 0.6)) {
-                    lasers.push({ x: curX + 10, y: curY - 300, w: 12, h: 300, state: 'off', timer: Math.random() * 120 });
-                }
-
-                curX += w;
-            }
-
-            // End of sector - Vertical climb
-            const endX = curX;
-            const climbHeight = 150;
-            for(let i = 0; i < 8; i++) {
-                const px = endX + (i % 2 === 0 ? 30 : 260);
-                const py = curY - (i + 1) * climbHeight;
-                
-                let type = 'normal';
-                if (num > 1 && i > 4 && Math.random() > 0.5) type = 'fading';
-                
-                platforms.push({ x: px, y: py, w: 180, h: 30, type });
-                
-                if (i === 7) {
-                    // Goal is now a vertical shaft
-                    platforms.push({ x: px - 40, y: py - 200, w: 260, h: 40, type: 'goal' });
+                // Vertical climb at end
+                const endX = curX;
+                const climbHeight = 150;
+                for(let i = 0; i < 8; i++) {
+                    const px = endX + (i % 2 === 0 ? 30 : 260);
+                    const py = curY - (i + 1) * climbHeight;
+                    let type = 'normal';
+                    if (num > 1 && i > 4 && Math.random() > 0.5) type = 'fading';
+                    platforms.push({ x: px, y: py, w: 180, h: 30, type });
+                    if (i === 7) platforms.push({ x: px - 40, y: py - 200, w: 260, h: 40, type: 'goal' });
                 }
             }
+        }
+
+        function spawnWave(waveNum) {
+            enemies = [];
+            waveTransition = false;
+            const count = 2 + waveNum * 2;
+            const arenaY = height - 150;
+            for(let i = 0; i < count; i++) {
+                enemies.push({
+                    x: -200 + Math.random() * 1400,
+                    y: arenaY - 40 - Math.random() * 200,
+                    w: 30, h: 30,
+                    vx: 2 + Math.random() * 2,
+                    platform: { x: -500, w: 2000 },
+                    health: 1,
+                    type: 'drone'
+                });
+            }
+            showMsg("WAVE " + waveNum);
         }
 
         function resetPlayer() {
@@ -454,6 +496,12 @@
             if (chargeBar) chargeBar.style.width = '0%';
             isTransitioning = false;
             transitionAlpha = 0;
+            if (sector === 4) {
+                currentWave = 1;
+                arenaActive = true;
+                waveTransition = false;
+                spawnWave(currentWave);
+            }
         }
 
         function advanceSector() {
@@ -650,6 +698,21 @@
                 else player.vx *= 0.8;
 
                 player.vy += GRAVITY;
+            }
+
+            // Arena Logic
+            if (arenaActive && sector === 4) {
+                if (enemies.length === 0 && !waveTransition) {
+                    if (currentWave < totalWaves) {
+                        waveTransition = true;
+                        currentWave++;
+                        setTimeout(() => spawnWave(currentWave), 1500);
+                    } else {
+                        arenaActive = false;
+                        showMsg("ARENA CLEARED - PORTAL OPEN");
+                        platforms.push({ x: 500, y: height - 350, w: 200, h: 40, type: 'goal' });
+                    }
+                }
             }
             
             player.x += player.vx;
@@ -1101,152 +1164,36 @@
             });
             ctx.globalAlpha = 1.0;
 
-            // Player (Stickman)
+            // Player (Cube)
             ctx.save();
-            ctx.translate(player.x + player.w/2, player.y + player.h/2);
+            ctx.translate(player.x, player.y);
             
-            // Body Lean
-            let lean = 0;
-            const isMoving = Math.abs(player.vx) > 0.8;
-            if (isMoving && player.grounded) lean = player.facing * 0.15;
-            if (!player.grounded) lean = player.facing * 0.1;
-            ctx.rotate(lean);
-
             // Dash trail
             if (player.isDashing) {
                 ctx.globalAlpha = 0.5;
                 ctx.fillStyle = '#00f2ff';
-                ctx.beginPath();
-                ctx.arc(-player.w * player.facing, 0, 20, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillRect(-player.vx * 2, -player.vy * 2, player.w, player.h);
                 ctx.globalAlpha = 1.0;
             }
 
-            const stickColor = '#fff';
-            ctx.strokeStyle = stickColor;
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+            const cubeColor = '#00f2ff';
             ctx.shadowBlur = 15;
-            ctx.shadowColor = stickColor;
-
-            // Animation logic
-            const walkCycle = isMoving && player.grounded ? Math.sin(frameCount * 0.2) : 0;
-            const runCycle = isMoving && player.grounded ? frameCount * 0.2 : 0;
+            ctx.shadowColor = cubeColor;
+            ctx.strokeStyle = cubeColor;
+            ctx.lineWidth = 3;
             
-            // Head
-            ctx.beginPath();
-            ctx.arc(0, -22, 9, 0, Math.PI * 2);
-            ctx.stroke();
+            // Draw the cube
+            ctx.strokeRect(0, 0, player.w, player.h);
+            ctx.fillStyle = 'rgba(0, 242, 255, 0.2)';
+            ctx.fillRect(0, 0, player.w, player.h);
             
-            // Body
-            ctx.beginPath();
-            ctx.moveTo(0, -13);
-            ctx.lineTo(0, 12);
-            ctx.stroke();
-            
-            let handX = 0, handY = 0;
-
-            // Arms with Elbows
-            ctx.beginPath();
-            if (player.isAttacking) {
-                // Attacking pose
-                handX = player.facing * 30;
-                handY = -5;
-                // Front arm
-                ctx.moveTo(0, -8);
-                ctx.lineTo(player.facing * 15, -10);
-                ctx.lineTo(handX, handY);
-                // Back arm
-                ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 10, 0);
-                ctx.lineTo(-player.facing * 20, 10);
-            } else if (!player.grounded) {
-                // Jumping pose: Arms extended backwards, knees bent
-                handX = -player.facing * 25;
-                handY = 5;
-                // Arm 1
-                ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 15, -5);
-                ctx.lineTo(handX, handY);
-                // Arm 2
-                ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 10, 0);
-                ctx.lineTo(-player.facing * 20, 15);
-            } else if (isMoving) {
-                // Running pose: Dynamic scissor swing
-                const swing = Math.sin(runCycle);
-                handX = player.facing * swing * 25;
-                handY = 5;
-                // Front arm
-                ctx.moveTo(0, -8);
-                ctx.lineTo(player.facing * swing * 15, 0);
-                ctx.lineTo(handX, handY);
-                // Back arm
-                const bSwing = Math.sin(runCycle + Math.PI);
-                ctx.moveTo(0, -8);
-                ctx.lineTo(player.facing * bSwing * 15, 0);
-                ctx.lineTo(player.facing * bSwing * 25, 5);
-            } else {
-                // Idle pose
-                handX = player.facing * 10;
-                handY = 12;
-                ctx.moveTo(0, -8);
-                ctx.lineTo(player.facing * 5, 5);
-                ctx.lineTo(handX, handY);
-                ctx.moveTo(0, -8);
-                ctx.lineTo(-player.facing * 5, 5);
-                ctx.lineTo(-player.facing * 10, 12);
-            }
-            ctx.stroke();
-            
-            // Legs with Knees (Natural Scissor Motion)
-            ctx.beginPath();
-            if (!player.grounded) {
-                // Jumping legs: Knees bent
-                // Leg 1
-                ctx.moveTo(0, 12);
-                ctx.lineTo(player.facing * 10, 25);
-                ctx.lineTo(player.facing * 5, 35);
-                // Leg 2
-                ctx.moveTo(0, 12);
-                ctx.lineTo(-player.facing * 10, 20);
-                ctx.lineTo(-player.facing * 15, 30);
-            } else if (isMoving) {
-                // Running legs: Dynamic scissor motion
-                const s1 = Math.sin(runCycle);
-                const s2 = Math.sin(runCycle + Math.PI);
-                
-                const drawLeg = (s) => {
-                    const tx = player.facing * s * 18;
-                    const ty = 28;
-                    const sx = tx + player.facing * (s > 0 ? 8 : -8);
-                    const sy = 40;
-                    ctx.moveTo(0, 12);
-                    ctx.lineTo(tx, ty);
-                    ctx.lineTo(sx, sy);
-                };
-                drawLeg(s1);
-                drawLeg(s2);
-            } else {
-                // Idle legs
-                ctx.moveTo(0, 12);
-                ctx.lineTo(5, 25);
-                ctx.lineTo(8, 40);
-                ctx.moveTo(0, 12);
-                ctx.lineTo(-5, 25);
-                ctx.lineTo(-8, 40);
-            }
-            ctx.stroke();
-
-            ctx.strokeStyle = stickColor; // Reset
-
             ctx.shadowBlur = 0;
 
-            // Sword (Attached to Hand)
+            // Sword (Attached to Cube)
             if (player.isAttacking || player.isDashing || player.isCharging) {
                 ctx.save();
-                ctx.translate(handX, handY);
+                // Attach to the side of the cube
+                ctx.translate(player.facing === 1 ? player.w : 0, player.h / 2);
                 
                 let angle = 0;
                 if (player.isCharging) {

@@ -218,14 +218,15 @@
         const GRAVITY = 0.55;
         const JUMP_FORCE = -12.5;
         const MOVE_SPEED = 7;
-        const PLAYER_SIZE = 30;
+        const PLAYER_SIZE_W = 30;
+        const PLAYER_SIZE_H = 60;
 
         // Game State
         let sector = 1;
         let health = 100;
         let pixelCoins = 0;
         let player = { 
-            x: 100, y: 0, vx: 0, vy: 0, w: PLAYER_SIZE, h: PLAYER_SIZE, 
+            x: 100, y: 0, vx: 0, vy: 0, w: PLAYER_SIZE_W, h: PLAYER_SIZE_H, 
             grounded: false, jumps: 0, facing: 1,
             isAttacking: false, attackTimer: 0, attackType: 'normal',
             charge: 0, isCharging: false, isDashing: false, dashTimer: 0
@@ -245,6 +246,19 @@
         let frameCount = 0;
         let transitionAlpha = 0;
         let isTransitioning = false;
+
+        let stars = [];
+        function initStars() {
+            stars = [];
+            for(let i = 0; i < 150; i++) {
+                stars.push({
+                    x: Math.random() * 5000,
+                    y: Math.random() * height,
+                    size: Math.random() * 2,
+                    speed: 0.005 + Math.random() * 0.02
+                });
+            }
+        }
 
         function initBuildings() {
             buildings = [];
@@ -824,6 +838,16 @@
             bgGrad.addColorStop(1, '#1a0525');
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, width, height);
+
+            // Stars
+            ctx.fillStyle = '#fff';
+            stars.forEach(s => {
+                const sx = (s.x + cameraX * s.speed) % 5000;
+                const drawX = sx < 0 ? sx + 5000 : sx;
+                ctx.globalAlpha = 0.3 + Math.sin(frameCount * 0.05 + s.x) * 0.2;
+                ctx.fillRect(drawX, s.y, s.size, s.size);
+            });
+            ctx.globalAlpha = 1.0;
             
             ctx.strokeStyle = 'rgba(0, 242, 255, 0.03)';
             ctx.lineWidth = 1;
@@ -1081,6 +1105,13 @@
             ctx.save();
             ctx.translate(player.x + player.w/2, player.y + player.h/2);
             
+            // Body Lean
+            let lean = 0;
+            const isMoving = Math.abs(player.vx) > 0.8;
+            if (isMoving && player.grounded) lean = player.facing * 0.15;
+            if (!player.grounded) lean = player.facing * 0.1;
+            ctx.rotate(lean);
+
             // Dash trail
             if (player.isDashing) {
                 ctx.globalAlpha = 0.5;
@@ -1093,138 +1124,156 @@
 
             const stickColor = '#fff';
             ctx.strokeStyle = stickColor;
-            ctx.lineWidth = 5;
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 20;
+            ctx.lineJoin = 'round';
+            ctx.shadowBlur = 15;
             ctx.shadowColor = stickColor;
 
             // Animation logic
-            const isMoving = Math.abs(player.vx) > 0.8;
-            const walkCycle = isMoving && player.grounded ? Math.sin(frameCount * 0.3) : 0;
+            const walkCycle = isMoving && player.grounded ? Math.sin(frameCount * 0.25) : 0;
+            const runCycle = isMoving && player.grounded ? frameCount * 0.25 : 0;
             
             // Head
             ctx.beginPath();
-            ctx.arc(0, -25, 10, 0, Math.PI * 2);
+            ctx.arc(0, -22, 9, 0, Math.PI * 2);
             ctx.stroke();
             
             // Body
             ctx.beginPath();
-            ctx.moveTo(0, -15);
-            ctx.lineTo(0, 15);
+            ctx.moveTo(0, -13);
+            ctx.lineTo(0, 12);
             ctx.stroke();
             
+            let handX = 0, handY = 0;
+
             // Arms
             ctx.beginPath();
             if (player.isAttacking) {
-                // Attacking pose: Sword arm extended, other arm back
-                ctx.moveTo(0, -10);
-                ctx.lineTo(player.facing * 30, -15);
-                ctx.moveTo(0, -10);
+                // Attacking pose
+                handX = player.facing * 30;
+                handY = -15;
+                ctx.moveTo(0, -8);
+                ctx.lineTo(handX, handY);
+                ctx.moveTo(0, -8);
                 ctx.lineTo(-player.facing * 15, 5);
             } else if (!player.grounded) {
-                // Jumping pose: Arms up and out
-                ctx.moveTo(0, -10);
-                ctx.lineTo(player.facing * 25, -30);
-                ctx.moveTo(0, -10);
-                ctx.lineTo(-player.facing * 25, -30);
+                // Jumping pose: Athletic forward reach
+                handX = player.facing * 20;
+                handY = -25;
+                ctx.moveTo(0, -8);
+                ctx.lineTo(handX, handY);
+                ctx.moveTo(0, -8);
+                ctx.lineTo(-player.facing * 10, -20);
             } else if (isMoving) {
-                // Running pose: Arms swinging wide
-                ctx.moveTo(0, -10);
-                ctx.lineTo(player.facing * 25 * walkCycle, 10);
-                ctx.moveTo(0, -10);
-                ctx.lineTo(-player.facing * 25 * walkCycle, 10);
+                // Running pose: Pumping arms
+                const armSwing = Math.sin(runCycle);
+                handX = player.facing * 20 * armSwing;
+                handY = 10;
+                ctx.moveTo(0, -8);
+                ctx.lineTo(handX, handY);
+                ctx.moveTo(0, -8);
+                ctx.lineTo(-player.facing * 20 * armSwing, 10);
             } else {
-                // Idle pose: Arms relaxed at sides (Static)
-                ctx.moveTo(0, -10);
-                ctx.lineTo(player.facing * 15, 15);
-                ctx.moveTo(0, -10);
-                ctx.lineTo(-player.facing * 15, 15);
+                // Idle pose
+                handX = player.facing * 12;
+                handY = 12;
+                ctx.moveTo(0, -8);
+                ctx.lineTo(handX, handY);
+                ctx.moveTo(0, -8);
+                ctx.lineTo(-player.facing * 12, 12);
             }
             ctx.stroke();
             
-            // Legs
+            // Legs with Knees
             ctx.beginPath();
             if (!player.grounded) {
-                // Jumping legs: Tucked up (Dynamic)
-                const tuck = Math.min(10, Math.abs(player.vy));
-                ctx.moveTo(0, 15);
-                ctx.lineTo(player.facing * 20, 25 - tuck);
-                ctx.moveTo(0, 15);
-                ctx.lineTo(-player.facing * 15, 30 - tuck);
+                // Jumping legs: One tucked, one trailing
+                const jumpProgress = Math.min(1, Math.abs(player.vy) / 15);
+                // Front leg
+                ctx.moveTo(0, 12);
+                ctx.lineTo(player.facing * 10, 20);
+                ctx.lineTo(player.facing * 15, 25);
+                // Back leg
+                ctx.moveTo(0, 12);
+                ctx.lineTo(-player.facing * 15, 20);
+                ctx.lineTo(-player.facing * 20, 30);
             } else if (isMoving) {
-                // Running legs: Cycling motion (Dynamic)
-                const legSwing = Math.cos(frameCount * 0.3);
-                ctx.moveTo(0, 15);
-                ctx.lineTo(player.facing * 25 * legSwing, 40);
-                ctx.moveTo(0, 15);
-                ctx.lineTo(-player.facing * 25 * legSwing, 40);
+                // Running legs: Cycling with knees
+                const legCycle1 = runCycle;
+                const legCycle2 = runCycle + Math.PI;
+                
+                const drawLeg = (cycle) => {
+                    const kneeX = player.facing * Math.sin(cycle) * 15;
+                    const kneeY = 25 + Math.cos(cycle) * 5;
+                    const footX = player.facing * Math.sin(cycle - 0.5) * 20;
+                    const footY = 30 + Math.cos(cycle - 0.5) * 5;
+                    ctx.moveTo(0, 12);
+                    ctx.lineTo(kneeX, kneeY);
+                    ctx.lineTo(footX, footY);
+                };
+                drawLeg(legCycle1);
+                drawLeg(legCycle2);
             } else {
-                // Idle legs: Standing still (Static)
-                ctx.moveTo(0, 15);
-                ctx.lineTo(10, 40);
-                ctx.moveTo(0, 15);
-                ctx.lineTo(-10, 40);
+                // Idle legs
+                ctx.moveTo(0, 12);
+                ctx.lineTo(8, 30);
+                ctx.moveTo(0, 12);
+                ctx.lineTo(-8, 30);
             }
             ctx.stroke();
 
             ctx.shadowBlur = 0;
 
-            // Sword (Actual Sword Shape)
+            // Sword (Attached to Hand)
             if (player.isAttacking || player.isDashing || player.isCharging) {
                 ctx.save();
+                ctx.translate(handX, handY);
+                
                 let angle = 0;
                 if (player.isCharging) {
-                    angle = -Math.PI / 10;
+                    angle = -Math.PI / 4;
                 } else if (player.isAttacking) {
-                    angle = (1 - player.attackTimer / 15) * Math.PI;
+                    angle = (1 - player.attackTimer / 15) * Math.PI - Math.PI/2;
                 } else if (player.isDashing) {
                     angle = Math.PI / 2;
                 }
                 
-                ctx.rotate(player.facing === 1 ? angle : -angle);
+                ctx.rotate(player.facing === 1 ? angle : -angle + Math.PI);
                 
                 const swordColor = player.charge >= 60 ? '#fff' : '#00f2ff';
                 const swordLen = 70;
                 
                 // Handle (Tsuka)
                 ctx.strokeStyle = '#111';
-                ctx.lineWidth = 8;
+                ctx.lineWidth = 6;
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.lineTo(player.facing * -20, 0);
+                ctx.lineTo(-15, 0);
                 ctx.stroke();
 
                 // Guard (Tsuba)
                 ctx.fillStyle = '#333';
-                ctx.fillRect(player.facing * -5, -12, 10, 24);
+                ctx.fillRect(-5, -10, 6, 20);
                 
-                // Blade (Physical Shape with Gradient)
-                const bladeGrad = ctx.createLinearGradient(0, -5, 0, 5);
+                // Blade
+                const bladeGrad = ctx.createLinearGradient(0, -4, 0, 4);
                 bladeGrad.addColorStop(0, swordColor);
                 bladeGrad.addColorStop(0.5, '#fff');
                 bladeGrad.addColorStop(1, swordColor);
                 
                 ctx.fillStyle = bladeGrad;
-                ctx.shadowBlur = 40;
+                ctx.shadowBlur = 30;
                 ctx.shadowColor = swordColor;
                 
                 ctx.beginPath();
-                ctx.moveTo(0, -5);
-                ctx.lineTo(player.facing * (swordLen - 15), -5);
-                ctx.lineTo(player.facing * swordLen, 0); // Pointy tip
-                ctx.lineTo(player.facing * (swordLen - 15), 5);
-                ctx.lineTo(0, 5);
+                ctx.moveTo(0, -4);
+                ctx.lineTo(swordLen - 12, -4);
+                ctx.lineTo(swordLen, 0);
+                ctx.lineTo(swordLen - 12, 4);
+                ctx.lineTo(0, 4);
                 ctx.closePath();
                 ctx.fill();
-                
-                // Blade Edge (Sharp Highlight)
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.shadowBlur = 0;
-                ctx.beginPath();
-                ctx.moveTo(player.facing * 5, -2);
-                ctx.lineTo(player.facing * (swordLen - 10), -2);
-                ctx.stroke();
                 
                 ctx.restore();
             }
@@ -1258,6 +1307,7 @@
             requestAnimationFrame(loop);
         }
 
+        initStars();
         initBuildings();
         generateSector(1);
         resetPlayer();

@@ -828,24 +828,15 @@
             // Update Coins
             for (let i = coins.length - 1; i >= 0; i--) {
                 const c = coins[i];
-                const dx = (player.x + player.w/2) - c.x;
-                const dy = (player.y + player.h/2) - c.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist < 50) {
-                    coins_collected += 10;
-                    coins.splice(i, 1);
-                    if (document.getElementById('coin-val')) document.getElementById('coin-val').innerText = coins_collected;
-                }
-            }
                 c.y += Math.sin(frameCount * 0.1) * 0.5; // Floating animation
                 
                 const dx = (player.x + player.w/2) - c.x;
                 const dy = (player.y + player.h/2) - c.y;
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 
-                if (dist < 40) {
-                    pixelCoins++;
-                    if (coinVal) coinVal.innerText = pixelCoins;
+                if (dist < 50) {
+                    coins_collected += 10;
+                    if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
                     createParticles(c.x, c.y, '#ffd700', 10);
                     coins.splice(i, 1);
                 }

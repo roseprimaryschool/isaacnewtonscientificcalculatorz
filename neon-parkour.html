@@ -113,6 +113,38 @@
             transition: width 0.1s;
         }
 
+        #hotbar {
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+            pointer-events: auto;
+        }
+        .slot {
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid var(--neon-cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 9px;
+            color: var(--neon-cyan);
+            cursor: pointer;
+            box-shadow: 4px 4px 0px var(--neon-cyan);
+            transition: all 0.1s;
+        }
+        .slot.active {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 4px 4px 0px #fff;
+            transform: translateY(-5px);
+        }
+
         #shop-btn {
             position: absolute;
             top: 20px;
@@ -206,12 +238,18 @@
     <div id="message">SECTOR CLEAR</div>
     <button id="shop-btn">NEON SHOP</button>
 
+    <div id="hotbar" style="display: none;">
+        <div class="slot active" id="slot-sword">SWORD</div>
+        <div class="slot" id="slot-bow">BOW</div>
+    </div>
+
     <div id="mobile-controls">
         <div class="control-group">
             <div class="btn" id="btn-left">←</div>
             <div class="btn" id="btn-right">→</div>
         </div>
-        <div class="control-group">
+        <div class="control-group" style="gap: 15px;">
+            <div class="btn" id="btn-switch" style="border-color: #ffd700; color: #ffd700; box-shadow: 4px 4px 0px #ffd700; font-size: 12px; display: none;">SWAP</div>
             <div class="btn" id="btn-attack" style="border-color: var(--neon-pink); color: var(--neon-pink); box-shadow: 4px 4px 0px var(--neon-pink);">ATK</div>
             <div class="btn" id="btn-jump">UP</div>
         </div>
@@ -230,21 +268,71 @@
         const shopBtn = document.getElementById('shop-btn');
         const sectorBox = document.getElementById('sector-box');
         const mobileControls = document.getElementById('mobile-controls');
+        const hotbar = document.getElementById('hotbar');
+        const slotSword = document.getElementById('slot-sword');
+        const slotBow = document.getElementById('slot-bow');
+        const btnSwitch = document.getElementById('btn-switch');
 
         function toggleShop() {
             showShop = !showShop;
+            selectedShopItem = -1; // Reset selection
             if (showShop) {
                 if (sectorBox) sectorBox.style.display = 'none';
                 if (mobileControls) mobileControls.style.display = 'none';
+                if (hotbar) hotbar.style.display = 'none';
                 if (shopBtn) shopBtn.innerText = 'CLOSE SHOP';
             } else {
                 if (sectorBox) sectorBox.style.display = 'block';
                 if (shopBtn) shopBtn.innerText = 'NEON SHOP';
+                if (player.hasBow && hotbar) hotbar.style.display = 'flex';
                 if (mobileControls && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
                     mobileControls.style.display = 'flex';
                 }
             }
         }
+
+        canvas.addEventListener('click', (e) => {
+            if (!showShop) return;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            shopItems.forEach((item, idx) => {
+                const y = height/2 - 40 + idx * 60;
+                if (mouseX > width/2 - 180 && mouseX < width/2 + 180 &&
+                    mouseY > y - 20 && mouseY < y + 30) {
+                    buyItem(idx);
+                }
+            });
+        });
+
+        function switchWeapon() {
+            if (!player.hasBow) return;
+            player.weapon = player.weapon === 'sword' ? 'bow' : 'sword';
+            updateHotbar();
+        }
+
+        function updateHotbar() {
+            if (!player.hasBow) {
+                if (hotbar) hotbar.style.display = 'none';
+                if (btnSwitch) btnSwitch.style.display = 'none';
+                return;
+            }
+            if (hotbar) hotbar.style.display = 'flex';
+            if (btnSwitch) btnSwitch.style.display = 'flex';
+            
+            if (player.weapon === 'sword') {
+                slotSword.classList.add('active');
+                slotBow.classList.remove('active');
+            } else {
+                slotSword.classList.remove('active');
+                slotBow.classList.add('active');
+            }
+        }
+
+        if (slotSword) slotSword.addEventListener('click', () => { player.weapon = 'sword'; updateHotbar(); });
+        if (slotBow) slotBow.addEventListener('click', () => { if(player.hasBow) { player.weapon = 'bow'; updateHotbar(); } });
+        if (btnSwitch) btnSwitch.addEventListener('touchstart', (e) => { e.preventDefault(); switchWeapon(); });
 
         if (shopBtn) {
             shopBtn.addEventListener('click', toggleShop);
@@ -277,8 +365,11 @@
             x: 100, y: 0, vx: 0, vy: 0, w: PLAYER_SIZE_W, h: PLAYER_SIZE_H, 
             grounded: false, jumps: 0, facing: 1,
             isAttacking: false, attackTimer: 0, attackType: 'normal',
-            charge: 0, isCharging: false, isDashing: false, dashTimer: 0
+            charge: 0, isCharging: false, isDashing: false, dashTimer: 0,
+            weapon: 'sword', hasBow: false, chargeSpeed: 1, damageResist: 1
         };
+        let arrows = [];
+        let selectedShopItem = -1;
         let platforms = [];
         let spikes = [];
         let lasers = [];
@@ -301,7 +392,7 @@
         let waveTransition = false;
         let showShop = false;
         let shopItems = [
-            { name: 'REPAIR KIT', price: 50, desc: '+50 HP', action: () => { health = Math.min(100, health + 50); if(healthBar) healthBar.style.width = health + '%'; } },
+            { name: 'NEON BOW', price: 100, desc: 'RANGED WEAPON', action: () => { player.hasBow = true; player.weapon = 'bow'; updateHotbar(); } },
             { name: 'POWER CORE', price: 100, desc: 'FASTER CHARGE', action: () => { player.chargeSpeed = 2; } },
             { name: 'SHIELD', price: 150, desc: 'REDUCE DAMAGE', action: () => { player.damageResist = 0.5; } }
         ];
@@ -623,23 +714,34 @@
 
         function buyItem(idx) {
             const item = shopItems[idx];
-            if (coins_collected >= item.price) {
-                coins_collected -= item.price;
-                item.action();
-                const coinVal = document.getElementById('coin-val');
-                if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
-                showMsg("PURCHASED: " + item.name);
+            if (selectedShopItem === idx) {
+                if (coins_collected >= item.price) {
+                    coins_collected -= item.price;
+                    item.action();
+                    const coinVal = document.getElementById('coin-val');
+                    if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
+                    showMsg("PURCHASED: " + item.name);
+                    selectedShopItem = -1;
+                } else {
+                    showMsg("INSUFFICIENT COINS");
+                    selectedShopItem = -1;
+                }
             } else {
-                showMsg("INSUFFICIENT COINS");
+                selectedShopItem = idx;
+                showMsg("CONFIRM PURCHASE: " + item.name);
             }
         }
         window.addEventListener('keyup', e => {
             if (e.code === 'KeyJ' || e.code === 'KeyK' || e.code === 'KeyF') {
                 if (player.isCharging) {
-                    if (player.charge >= 60) {
-                        startDashAttack();
+                    if (player.weapon === 'bow') {
+                        fireBow();
                     } else {
-                        startNormalAttack();
+                        if (player.charge >= 60) {
+                            startDashAttack();
+                        } else {
+                            startNormalAttack();
+                        }
                     }
                     player.isCharging = false;
                     player.charge = 0;
@@ -662,6 +764,21 @@
             player.vx = player.facing * 25;
             player.vy = 0;
             createParticles(player.x, player.y + player.h/2, varColor('--neon-pink'), 10);
+        }
+
+        function fireBow() {
+            const chargeFactor = player.charge / 100;
+            const speed = 12 + chargeFactor * 18;
+            const damage = 1 + chargeFactor * 4;
+            arrows.push({
+                x: player.x + player.w/2,
+                y: player.y + player.h/2,
+                vx: player.facing * speed,
+                vy: -1.5,
+                damage: damage
+            });
+            player.charge = 0;
+            if (chargeBar) chargeBar.style.width = '0%';
         }
 
         function setupMobileBtn(id, key) {
@@ -696,10 +813,14 @@
                 e.preventDefault(); 
                 if (id === 'btn-attack') {
                     if (player.isCharging) {
-                        if (player.charge >= 60) {
-                            startDashAttack();
+                        if (player.weapon === 'bow') {
+                            fireBow();
                         } else {
-                            startNormalAttack();
+                            if (player.charge >= 60) {
+                                startDashAttack();
+                            } else {
+                                startNormalAttack();
+                            }
                         }
                         player.isCharging = false;
                         player.charge = 0;
@@ -747,9 +868,12 @@
             // Combat Logic
             if (player.isCharging) {
                 player.charge += (player.chargeSpeed || 1);
-                if (chargeBar) chargeBar.style.width = Math.min(100, (player.charge / 60) * 100) + '%';
-                if (player.charge === 60) {
-                    createParticles(player.x + player.w/2, player.y + player.h/2, '#fff', 10);
+                const maxCharge = player.weapon === 'bow' ? 100 : 60;
+                if (player.charge > maxCharge) player.charge = maxCharge;
+                
+                if (chargeBar) chargeBar.style.width = Math.min(100, (player.charge / maxCharge) * 100) + '%';
+                if (player.charge === maxCharge) {
+                    createParticles(player.x + player.w/2, player.y + player.h/2, '#fff', 2);
                 }
             }
 
@@ -1039,6 +1163,44 @@
                 p.x += p.vx; p.y += p.vy;
                 p.life -= 0.02;
                 if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Update Arrows
+            for (let i = arrows.length - 1; i >= 0; i--) {
+                const a = arrows[i];
+                a.x += a.vx;
+                a.y += a.vy;
+                a.vy += 0.15; // Gravity for arrows
+                
+                // Collision with enemies
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const en = enemies[j];
+                    if (a.x > en.x && a.x < en.x + en.w && a.y > en.y && a.y < en.y + en.h) {
+                        en.health -= a.damage;
+                        createParticles(a.x, a.y, varColor('--neon-cyan'), 10);
+                        if (en.health <= 0) {
+                            createParticles(en.x + en.w/2, en.y + en.h/2, varColor('--neon-cyan'), 15);
+                            coins_collected += 10;
+                            const coinVal = document.getElementById('coin-val');
+                            if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
+                            enemies.splice(j, 1);
+                        }
+                        arrows.splice(i, 1);
+                        break;
+                    }
+                }
+                
+                // Collision with platforms
+                platforms.forEach(p => {
+                    if (a.x > p.x && a.x < p.x + p.w && a.y > p.y && a.y < p.y + p.h) {
+                        arrows.splice(i, 1);
+                    }
+                });
+                
+                // Remove out of bounds
+                if (a.x < player.x - width || a.x > player.x + width || a.y > height + 500) {
+                    if (arrows[i]) arrows.splice(i, 1);
+                }
             }
 
             // Fall off
@@ -1362,6 +1524,16 @@
             });
             ctx.globalAlpha = 1.0;
 
+            // Arrows
+            arrows.forEach(a => {
+                ctx.strokeStyle = varColor('--neon-pink');
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(a.x + cameraX, a.y + cameraY);
+                ctx.lineTo(a.x + cameraX - a.vx * 1.5, a.y + cameraY - a.vy * 1.5);
+                ctx.stroke();
+            });
+
             // Player (Cube)
             ctx.save();
             ctx.translate(player.x, player.y);
@@ -1387,56 +1559,87 @@
             
             ctx.shadowBlur = 0;
 
-            // Sword (Attached to Cube)
-            if (player.isAttacking || player.isDashing || player.isCharging) {
-                ctx.save();
-                // Attach to the side of the cube
-                ctx.translate(player.facing === 1 ? player.w : 0, player.h / 2);
-                
-                let angle = 0;
-                if (player.isCharging) {
-                    angle = -Math.PI / 4;
-                } else if (player.isAttacking) {
-                    angle = (1 - player.attackTimer / 15) * Math.PI - Math.PI/2;
-                } else if (player.isDashing) {
-                    angle = Math.PI / 2;
-                }
-                
-                ctx.rotate(player.facing === 1 ? angle : -angle + Math.PI);
-                
-                const swordColor = player.charge >= 60 ? '#fff' : '#00f2ff';
-                const swordLen = 70;
-                
-                // Handle (Tsuka)
-                ctx.strokeStyle = '#111';
-                ctx.lineWidth = 6;
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.lineTo(-15, 0);
-                ctx.stroke();
+            // Sword / Bow (Attached to Cube)
+            if (player.weapon === 'sword') {
+                if (player.isAttacking || player.isDashing || player.isCharging) {
+                    ctx.save();
+                    // Attach to the side of the cube
+                    ctx.translate(player.facing === 1 ? player.w : 0, player.h / 2);
+                    
+                    let angle = 0;
+                    if (player.isCharging) {
+                        angle = -Math.PI / 4;
+                    } else if (player.isAttacking) {
+                        angle = (1 - player.attackTimer / 15) * Math.PI - Math.PI/2;
+                    } else if (player.isDashing) {
+                        angle = Math.PI / 2;
+                    }
+                    
+                    ctx.rotate(player.facing === 1 ? angle : -angle + Math.PI);
+                    
+                    const swordColor = player.charge >= 60 ? '#fff' : '#00f2ff';
+                    const swordLen = 70;
+                    
+                    // Handle (Tsuka)
+                    ctx.strokeStyle = '#111';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-15, 0);
+                    ctx.stroke();
 
-                // Guard (Tsuba)
-                ctx.fillStyle = '#333';
-                ctx.fillRect(-5, -10, 6, 20);
+                    // Guard (Tsuba)
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(-5, -10, 6, 20);
+                    
+                    // Blade
+                    const bladeGrad = ctx.createLinearGradient(0, -4, 0, 4);
+                    bladeGrad.addColorStop(0, swordColor);
+                    bladeGrad.addColorStop(0.5, '#fff');
+                    bladeGrad.addColorStop(1, swordColor);
+                    
+                    ctx.fillStyle = bladeGrad;
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = swordColor;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, -4);
+                    ctx.lineTo(swordLen - 12, -4);
+                    ctx.lineTo(swordLen, 0);
+                    ctx.lineTo(swordLen - 12, 4);
+                    ctx.lineTo(0, 4);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            } else if (player.weapon === 'bow') {
+                ctx.save();
+                ctx.translate(player.facing === 1 ? player.w : 0, player.h / 2);
+                ctx.rotate(player.facing === 1 ? 0 : Math.PI);
                 
-                // Blade
-                const bladeGrad = ctx.createLinearGradient(0, -4, 0, 4);
-                bladeGrad.addColorStop(0, swordColor);
-                bladeGrad.addColorStop(0.5, '#fff');
-                bladeGrad.addColorStop(1, swordColor);
-                
-                ctx.fillStyle = bladeGrad;
-                ctx.shadowBlur = 30;
-                ctx.shadowColor = swordColor;
-                
+                // Draw Bow
+                ctx.strokeStyle = varColor('--neon-pink');
+                ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.moveTo(0, -4);
-                ctx.lineTo(swordLen - 12, -4);
-                ctx.lineTo(swordLen, 0);
-                ctx.lineTo(swordLen - 12, 4);
-                ctx.lineTo(0, 4);
-                ctx.closePath();
-                ctx.fill();
+                ctx.arc(0, 0, 25, -Math.PI/2, Math.PI/2);
+                ctx.stroke();
+                
+                // Draw String
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(0, -25);
+                const pull = player.isCharging ? (player.charge / 100) * 20 : 0;
+                ctx.lineTo(-pull, 0);
+                ctx.lineTo(0, 25);
+                ctx.stroke();
+                
+                // Draw Arrow if charging
+                if (player.isCharging) {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(-pull, -2, 30, 4);
+                }
                 
                 ctx.restore();
             }
@@ -1473,9 +1676,11 @@
                 
                 shopItems.forEach((item, idx) => {
                     const y = height/2 - 40 + idx * 60;
-                    ctx.fillStyle = coins_collected >= item.price ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+                    const isSelected = selectedShopItem === idx;
+                    
+                    ctx.fillStyle = isSelected ? 'rgba(0, 242, 255, 0.2)' : (coins_collected >= item.price ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 0, 0, 0.1)');
                     ctx.fillRect(width/2 - 180, y - 20, 360, 50);
-                    ctx.strokeStyle = coins_collected >= item.price ? varColor('--neon-cyan') : '#555';
+                    ctx.strokeStyle = isSelected ? '#fff' : (coins_collected >= item.price ? varColor('--neon-cyan') : '#555');
                     ctx.strokeRect(width/2 - 180, y - 20, 360, 50);
                     
                     ctx.fillStyle = '#fff';
@@ -1486,12 +1691,13 @@
                     ctx.fillText(item.desc, width/2 - 170, y + 20);
                     
                     ctx.textAlign = 'right';
-                    ctx.fillStyle = varColor('--neon-cyan');
-                    ctx.fillText(`${item.price}C`, width/2 + 170, y + 10);
+                    ctx.fillStyle = isSelected ? '#fff' : varColor('--neon-cyan');
+                    ctx.fillText(isSelected ? 'CONFIRM?' : `${item.price}C`, width/2 + 170, y + 10);
                     
                     ctx.font = '8px Orbitron';
                     ctx.fillStyle = '#888';
-                    ctx.fillText('PRESS 1, 2, or 3 TO BUY', width/2, height/2 + 135);
+                    ctx.textAlign = 'center';
+                    ctx.fillText('CLICK ITEMS OR PRESS 1-3 TO BUY', width/2, height/2 + 135);
                 });
             }
         }

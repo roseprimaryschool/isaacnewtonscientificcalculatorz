@@ -544,12 +544,10 @@
         let enemies = [];
         let coins = [];
         let particles = [];
-        let buildings = [];
         let cameraX = 0;
         let cameraY = 0;
         let keys = {};
         let frameCount = 0;
-        let transitionAlpha = 0;
         let isTransitioning = false;
         let currentWave = 0;
         let totalWaves = 3;
@@ -567,75 +565,6 @@
             { name: 'SHIELD', price: 150, desc: 'REDUCE DAMAGE', action: () => { player.damageResist = 0.5; } }
         ];
         let coins_collected = 0;
-
-        let stars = [];
-        function initStars() {
-            stars = [];
-            for(let i = 0; i < 150; i++) {
-                stars.push({
-                    x: Math.random() * 5000,
-                    y: Math.random() * height,
-                    size: Math.random() * 2,
-                    speed: 0.005 + Math.random() * 0.02
-                });
-            }
-        }
-
-        function initBuildings() {
-            buildings = [];
-            const colors = ['#8b5cf6', '#1e1b4b', '#00f2ff'];
-            
-            // Tower Interior Walls (Background)
-            for(let i = 0; i < 10; i++) {
-                buildings.push({
-                    x: i * 1000,
-                    y: -2000,
-                    w: 1000,
-                    h: 10000,
-                    parallax: 0.05,
-                    color: '#050510',
-                    isWall: true,
-                    bricks: Array.from({length: 300}, () => ({
-                        x: Math.random(),
-                        y: Math.random(),
-                        w: 0.04 + Math.random() * 0.08,
-                        h: 0.004,
-                        color: Math.random() > 0.85 ? colors[Math.floor(Math.random() * colors.length)] : 'rgba(255,255,255,0.03)'
-                    })),
-                    windows: Array.from({length: 40}, () => ({
-                        x: 0.1 + Math.random() * 0.8,
-                        y: Math.random(),
-                        w: 0.08,
-                        h: 0.015,
-                        on: Math.random() > 0.4
-                    })),
-                    pipes: Array.from({length: 5}, () => ({
-                        x: Math.random(),
-                        w: 0.01 + Math.random() * 0.02,
-                        color: Math.random() > 0.5 ? '#1e1b4b' : '#2d2d4d'
-                    }))
-                });
-            }
-
-            // Structural Girders
-            for(let i = 0; i < 15; i++) {
-                const parallax = 0.08 + Math.random() * 0.04;
-                buildings.push({
-                    x: Math.random() * 10000,
-                    y: -2000,
-                    w: 60 + Math.random() * 40,
-                    h: 10000,
-                    parallax: parallax,
-                    color: '#111122',
-                    isBeam: true,
-                    glowColor: colors[Math.floor(Math.random() * colors.length)],
-                    crossbeams: Array.from({length: 50}, () => ({
-                        y: Math.random(),
-                        h: 0.002
-                    }))
-                });
-            }
-        }
 
         function generateFloor(num) {
             platforms = [];
@@ -824,7 +753,13 @@
             showMsg("WAVE " + waveNum);
         }
 
+        let waveTimeout = null;
+
         function resetPlayer() {
+            if (waveTimeout) {
+                clearTimeout(waveTimeout);
+                waveTimeout = null;
+            }
             const startPlatform = platforms[0] || { y: height - 150 };
             player.x = 100;
             player.y = startPlatform.y - player.h - 150;
@@ -845,7 +780,6 @@
             if (healthBar) healthBar.style.width = '100%';
             if (chargeBar) chargeBar.style.width = '0%';
             isTransitioning = false;
-            transitionAlpha = 0;
             isElevatorRising = false;
             
             if (arenaActive) {
@@ -855,9 +789,9 @@
                 // Restore pendingArena based on floor
                 const curY = height - 150;
                 if (floor === 3) {
-                    pendingArena = { triggerX: 2800, startX: 2700, endX: 3900, y: curY, waves: 2 };
+                    pendingArena = { triggerX: 2950, startX: 2660, endX: 3900, y: curY, waves: 2 };
                 } else if (floor === 5) {
-                    pendingArena = { triggerX: 2900, startX: 2760, endX: 4000, y: curY, waves: 2 };
+                    pendingArena = { triggerX: 3100, startX: 2760, endX: 4000, y: curY, waves: 2 };
                 }
                 
                 coins_collected = coinsAtArenaStart;
@@ -866,25 +800,16 @@
             }
         }
 
+        let floorTextTimer = 0;
+        let nextFloorNum = 1;
+
         function advanceFloor() {
             if (isTransitioning) return;
             isTransitioning = true;
             isElevatorRising = true;
             elevatorY = 0;
-            showMsg("ASCENDING TO FLOOR " + (floor + 1));
-            
-            let fadeOut = setInterval(() => {
-                transitionAlpha += 0.02;
-                elevatorY -= 10;
-                if (transitionAlpha >= 1) {
-                    clearInterval(fadeOut);
-                    floor++;
-                    const sectorVal = document.getElementById('sector-val');
-                    if (sectorVal) sectorVal.innerText = floor < 10 ? '0' + floor : floor;
-                    generateFloor(floor);
-                    resetPlayer();
-                }
-            }, 30);
+            nextFloorNum = floor + 1;
+            floorTextTimer = 180; // 3 seconds at 60fps
         }
 
         function showMsg(txt) {
@@ -1078,7 +1003,27 @@
         }
 
         function update() {
-            if (isTransitioning) return;
+            if (isTransitioning) {
+                player.vx = 0;
+                player.vy = 0;
+                player.y -= 10;
+                elevatorY -= 10;
+                floorTextTimer--;
+                
+                cameraX += (width / 2 - player.x - player.w / 2 - cameraX) * 0.1;
+                cameraY += (height / 2 - player.y - player.h / 2 - cameraY) * 0.1;
+
+                if (floorTextTimer <= 0) {
+                    isElevatorRising = false;
+                    isTransitioning = false;
+                    floor++;
+                    const sectorVal = document.getElementById('sector-val');
+                    if (sectorVal) sectorVal.innerText = floor < 10 ? '0' + floor : floor;
+                    generateFloor(floor);
+                    resetPlayer();
+                }
+                return;
+            }
             frameCount++;
             if (invincibilityFrames > 0) invincibilityFrames--;
 
@@ -1157,7 +1102,7 @@
                     if (currentWave < totalWaves) {
                         waveTransition = true;
                         currentWave++;
-                        setTimeout(() => spawnWave(currentWave), 1500);
+                        waveTimeout = setTimeout(() => spawnWave(currentWave), 1500);
                     } else {
                         arenaActive = false;
                         arenaCleared = true;
@@ -1181,10 +1126,6 @@
             
             player.x += player.vx;
             player.y += player.vy;
-
-            if (isElevatorRising) {
-                player.y -= 10;
-            }
 
             // Update Platforms
             platforms.forEach(p => {
@@ -1253,6 +1194,7 @@
             // Update Coins
             for (let i = coins.length - 1; i >= 0; i--) {
                 const c = coins[i];
+                if (!c) continue;
                 c.y += Math.sin(frameCount * 0.1) * 0.5; // Floating animation
                 
                 const dx = (player.x + player.w/2) - c.x;
@@ -1276,9 +1218,10 @@
                     }
                 } else {
                     l.timer++;
-                    // 70% ON, 30% OFF duty cycle
-                    const onTime = l.cycle * 0.7;
-                    if (l.timer >= l.cycle) {
+                    // 30% ON, 70% OFF duty cycle (easier lasers)
+                    const effectiveCycle = l.cycle * 1.5; // Make the cycle longer
+                    const onTime = effectiveCycle * 0.3;
+                    if (l.timer >= effectiveCycle) {
                         l.timer = 0;
                     }
                     l.state = l.timer < onTime ? 'on' : 'off';
@@ -1289,12 +1232,12 @@
             crushers.forEach(c => {
                 if (c.state === 'waiting') {
                     c.timer++;
-                    if (c.timer > 60) { c.state = 'dropping'; c.timer = 0; }
+                    if (c.timer > 15) { c.state = 'dropping'; c.timer = 0; } // Shorter wait
                 } else if (c.state === 'dropping') {
-                    c.y += (c.speed || 18);
+                    c.y += 40; // Drop very fast
                     if (c.y >= c.targetY) { c.y = c.targetY; c.state = 'rising'; }
                 } else if (c.state === 'rising') {
-                    c.y -= 2.5;
+                    c.y -= 1.0; // Rise slower
                     if (c.y <= c.startY) { c.y = c.startY; c.state = 'waiting'; }
                 }
             });
@@ -1370,6 +1313,7 @@
             // Enemy Collision & Combat
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const en = enemies[i];
+                if (!en) continue;
                 
                 // AI Logic
                 if (en.type === 'drone' || en.type === 'shield') {
@@ -1537,6 +1481,7 @@
             // Update Enemy Projectiles
             for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
                 const p = enemyProjectiles[i];
+                if (!p) continue;
                 p.x += p.vx;
                 p.y += p.vy;
                 
@@ -1606,6 +1551,7 @@
             // Particles
             for(let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
+                if (!p) continue;
                 p.x += p.vx; p.y += p.vy;
                 p.life -= 0.02;
                 if (p.life <= 0) particles.splice(i, 1);
@@ -1614,6 +1560,7 @@
             // Update Arrows
             for (let i = arrows.length - 1; i >= 0; i--) {
                 const a = arrows[i];
+                if (!a) continue;
                 a.x += a.vx;
                 a.y += a.vy;
                 a.vy += 0.15; // Gravity for arrows
@@ -1673,157 +1620,66 @@
         function drawBackground() {
             // Background Gradient: Dark Blue to Purple
             const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-            bgGrad.addColorStop(0, '#020205');
-            bgGrad.addColorStop(0.6, '#05051a');
-            bgGrad.addColorStop(1, '#1a0525');
+            bgGrad.addColorStop(0, '#050510');
+            bgGrad.addColorStop(0.5, '#0a0520');
+            bgGrad.addColorStop(1, '#150030');
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, width, height);
 
             // Neon Bricks Pattern
             ctx.save();
-            // Use a very slow parallax for the bricks
-            const pX = cameraX * 0.15;
-            const pY = cameraY * 0.15;
+            const pX = cameraX * 0.2;
+            const pY = cameraY * 0.2;
             
-            const brickW = 40;
-            const brickH = 20;
-            const gap = 4;
+            const brickW = 80;
+            const brickH = 35;
+            const gap = 5;
             const totalW = brickW + gap;
             const totalH = brickH + gap;
             
-            ctx.strokeStyle = 'rgba(0, 242, 255, 0.1)';
-            ctx.lineWidth = 1;
-            
-            const startX = Math.floor(-pX / totalW) * totalW - totalW;
-            const endX = startX + width + totalW * 2;
-            const startY = Math.floor(-pY / totalH) * totalH - totalH;
-            const endY = startY + height + totalH * 2;
+            const startCol = Math.floor(-pX / totalW) - 1;
+            const endCol = startCol + Math.ceil(width / totalW) + 2;
+            const startRow = Math.floor(-pY / totalH) - 1;
+            const endRow = startRow + Math.ceil(height / totalH) + 2;
 
-            for (let y = startY; y < endY; y += totalH) {
-                const row = Math.floor((y + pY) / totalH);
-                const xOffset = (row % 2 === 0) ? 0 : totalW / 2;
-                for (let x = startX; x < endX; x += totalW) {
-                    ctx.strokeRect(x + xOffset + (pX % totalW), y + (pY % totalH), brickW, brickH);
+            const colors = [
+                { stroke: 'rgba(0, 255, 255, 0.4)', fill: 'rgba(0, 255, 255, 0.05)', shadow: '#00ffff' }, // Cyan
+                { stroke: 'rgba(0, 85, 255, 0.4)', fill: 'rgba(0, 85, 255, 0.05)', shadow: '#0055ff' },  // Dark Blue
+                { stroke: 'rgba(176, 38, 255, 0.4)', fill: 'rgba(176, 38, 255, 0.05)', shadow: '#b026ff' },// Purple
+                { stroke: 'rgba(20, 20, 20, 0.6)', fill: 'rgba(5, 5, 5, 0.8)', shadow: 'transparent' }   // Black
+            ];
+
+            ctx.lineWidth = 2;
+
+            for (let i = 0; i < colors.length; i++) {
+                ctx.beginPath();
+                ctx.strokeStyle = colors[i].stroke;
+                ctx.fillStyle = colors[i].fill;
+                ctx.shadowColor = colors[i].shadow;
+                ctx.shadowBlur = (i === 3) ? 0 : 8;
+                
+                for (let row = startRow; row <= endRow; row++) {
+                    const y = row * totalH + pY;
+                    const xOffset = (Math.abs(row) % 2 === 1) ? totalW / 2 : 0;
+                    for (let col = startCol; col <= endCol; col++) {
+                        const rand = Math.abs(Math.sin(row * 12.9898 + col * 78.233)) * 43758.5453;
+                        const colorIndex = Math.floor(rand) % colors.length;
+                        
+                        if (colorIndex === i) {
+                            const x = col * totalW + xOffset + pX;
+                            ctx.rect(x, y, brickW, brickH);
+                        }
+                    }
                 }
+                ctx.fill();
+                ctx.stroke();
             }
+            
             ctx.restore();
-
-            // Stars (keep some for depth)
-            ctx.fillStyle = '#fff';
-            stars.forEach(s => {
-                const sx = (s.x + cameraX * s.speed) % 5000;
-                const drawX = sx < 0 ? sx + 5000 : sx;
-                ctx.globalAlpha = 0.2 + Math.sin(frameCount * 0.05 + s.x) * 0.1;
-                ctx.fillRect(drawX, s.y, s.size, s.size);
-            });
-            ctx.globalAlpha = 1.0;
         }
 
         function draw() {
             drawBackground();
-            
-            ctx.strokeStyle = 'rgba(0, 242, 255, 0.03)';
-            ctx.lineWidth = 1;
-            const gridSize = 60;
-            const offsetX = cameraX % gridSize;
-            const offsetY = cameraY % gridSize;
-            
-            ctx.beginPath();
-            for(let x = offsetX; x < width; x += gridSize) {
-                ctx.moveTo(x, 0); ctx.lineTo(x, height);
-            }
-            for(let y = offsetY; y < height; y += gridSize) {
-                ctx.moveTo(0, y); ctx.lineTo(width, y);
-            }
-            ctx.stroke();
-
-            // Buildings (Tower Background)
-            buildings.forEach(b => {
-                const bx = (b.x + cameraX * b.parallax) % 5000;
-                const drawX = bx < -b.w ? bx + 5000 : bx;
-                const drawY = b.y + cameraY * b.parallax;
-                
-                if (b.isWall) {
-                    ctx.fillStyle = b.color;
-                    ctx.fillRect(drawX, drawY, b.w, b.h);
-                    
-                    // Panels / Large Bricks
-                    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
-                    ctx.lineWidth = 1;
-                    for(let px = 0; px < b.w; px += 200) {
-                        ctx.strokeRect(drawX + px, drawY, 200, b.h);
-                    }
-
-                    // Pipes
-                    b.pipes.forEach(p => {
-                        ctx.fillStyle = p.color;
-                        ctx.fillRect(drawX + p.x * b.w, drawY, p.w * b.w, b.h);
-                        // Pipe highlights
-                        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-                        ctx.fillRect(drawX + p.x * b.w, drawY, (p.w * b.w) / 3, b.h);
-                    });
-
-                    // Bricks (Neon highlights)
-                    b.bricks.forEach(br => {
-                        ctx.fillStyle = br.color;
-                        ctx.fillRect(drawX + br.x * b.w, drawY + br.y * b.h, br.w * b.w, br.h * b.h);
-                        if (br.color !== 'rgba(255,255,255,0.03)') {
-                            ctx.shadowBlur = 5;
-                            ctx.shadowColor = br.color;
-                            ctx.fillRect(drawX + br.x * b.w, drawY + br.y * b.h, br.w * b.w, br.h * b.h);
-                            ctx.shadowBlur = 0;
-                        }
-                    });
-
-                    // Windows
-                    b.windows.forEach(w => {
-                        if (w.on) {
-                            ctx.fillStyle = 'rgba(0, 242, 255, 0.15)';
-                            ctx.fillRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
-                            ctx.strokeStyle = 'rgba(0, 242, 255, 0.4)';
-                            ctx.lineWidth = 1;
-                            ctx.strokeRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
-                            
-                            // Window frame/glow
-                            ctx.shadowBlur = 5;
-                            ctx.shadowColor = '#00f2ff';
-                            ctx.strokeRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
-                            ctx.shadowBlur = 0;
-                        }
-                    });
-                } else if (b.isBeam) {
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = b.glowColor;
-                    ctx.fillStyle = b.color;
-                    ctx.fillRect(drawX, drawY, b.w, b.h);
-                    
-                    // Crossbeams
-                    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-                    b.crossbeams.forEach(cb => {
-                        ctx.fillRect(drawX, drawY + cb.y * b.h, b.w, cb.h * b.h);
-                    });
-
-                    ctx.strokeStyle = b.glowColor;
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(drawX, drawY, b.w, b.h);
-                    ctx.shadowBlur = 0;
-                }
-            });
-
-            // Tower Walls (Foreground Parallax)
-            ctx.fillStyle = '#050510';
-            ctx.strokeStyle = '#1a1a2e';
-            ctx.lineWidth = 5;
-            const wallWidth = 100;
-            const wallParallax = 0.1;
-            const wallX = (-cameraX * wallParallax) % 2000;
-            for(let i = -1; i < 3; i++) {
-                const x = wallX + i * 2000;
-                ctx.fillRect(x, 0, wallWidth, height);
-                ctx.strokeRect(x, 0, wallWidth, height);
-                ctx.fillRect(x + 1900, 0, wallWidth, height);
-                ctx.strokeRect(x + 1900, 0, wallWidth, height);
-            }
 
             ctx.save();
             ctx.translate(cameraX, cameraY);
@@ -2261,10 +2117,37 @@
 
             ctx.restore();
 
-            // Transition Overlay
-            if (transitionAlpha > 0) {
-                ctx.fillStyle = `rgba(255, 255, 255, ${transitionAlpha})`;
+            // Floor Transition Text
+            if (isElevatorRising) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                
+                // Darken background slightly
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
                 ctx.fillRect(0, 0, width, height);
+
+                const text = "FLOOR " + nextFloorNum;
+                ctx.font = 'bold 80px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Draw cool text with colors dark blue, purple, cyan, and black
+                ctx.lineWidth = 12;
+                ctx.strokeStyle = '#050515'; // black
+                ctx.strokeText(text, width/2, height/4);
+                
+                ctx.lineWidth = 8;
+                ctx.strokeStyle = '#b026ff'; // purple
+                ctx.strokeText(text, width/2, height/4);
+                
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#0055ff'; // dark blue
+                ctx.strokeText(text, width/2, height/4);
+                
+                ctx.fillStyle = '#0ff'; // cyan
+                ctx.fillText(text, width/2, height/4);
+                
+                ctx.restore();
             }
 
             // Scanlines
@@ -2329,8 +2212,6 @@
             requestAnimationFrame(loop);
         }
 
-        initStars();
-        initBuildings();
         generateFloor(1);
         resetPlayer();
         loop();

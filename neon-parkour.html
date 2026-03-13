@@ -353,12 +353,15 @@
         const GRAVITY = 0.55;
         const JUMP_FORCE = -12.5;
         const MOVE_SPEED = 7;
+        const DRONE_SPEED = 2.5;
+        const DRONE_TRACK_SPEED = 0.04;
         const PLAYER_SIZE_W = 30;
         const PLAYER_SIZE_H = 30;
 
         // Game State
         let floor = 1;
         let health = 100;
+        let invincibilityFrames = 0;
         let pixelCoins = 0;
         let player = { 
             x: 100, y: 0, vx: 0, vy: 0, w: PLAYER_SIZE_W, h: PLAYER_SIZE_H, 
@@ -417,28 +420,39 @@
             buildings = [];
             // Palette: Purple, Dark Blue, Cyan
             const colors = ['#8b5cf6', '#1e1b4b', '#00f2ff'];
-            for(let i = 0; i < 80; i++) {
-                const parallax = 0.01 + Math.random() * 0.18;
-                const buildingWidth = 40 + Math.random() * 120;
+            
+            // Central Tower Core (Parallax)
+            for(let i = 0; i < 5; i++) {
                 buildings.push({
-                    x: Math.random() * 5000,
-                    y: height - (100 + Math.random() * 500),
-                    w: buildingWidth,
-                    h: 2000,
-                    parallax: parallax,
-                    color: colors[Math.floor(Math.random() * colors.length)],
-                    // Structured windows
-                    windows: Array.from({length: 40}, () => ({
+                    x: 1000 + i * 1500,
+                    y: -2000,
+                    w: 800,
+                    h: 10000,
+                    parallax: 0.05,
+                    color: '#0a0a1a',
+                    isCore: true,
+                    windows: Array.from({length: 100}, () => ({
                         x: 0.1 + Math.random() * 0.8,
-                        y: 0.01 + Math.random() * 0.9,
-                        w: 0.1,
-                        h: 0.006,
-                        on: Math.random() > 0.4
-                    })),
-                    hasAntenna: Math.random() > 0.4,
-                    antennaHeight: 40 + Math.random() * 80,
-                    glowIntensity: 0.3 + Math.random() * 0.5,
-                    hasSign: Math.random() > 0.8
+                        y: Math.random(),
+                        w: 0.05,
+                        h: 0.002,
+                        on: Math.random() > 0.3
+                    }))
+                });
+            }
+
+            // Structural Beams and Pipes
+            for(let i = 0; i < 40; i++) {
+                const parallax = 0.1 + Math.random() * 0.1;
+                buildings.push({
+                    x: Math.random() * 10000,
+                    y: -2000,
+                    w: 10 + Math.random() * 30,
+                    h: 10000,
+                    parallax: parallax,
+                    color: '#1a1a2e',
+                    isBeam: true,
+                    glowColor: colors[Math.floor(Math.random() * colors.length)]
                 });
             }
         }
@@ -465,9 +479,11 @@
                 platforms.push({ x: 1650, y: curY, w: 300, h: 40 }); // Large gap
                 platforms.push({ x: 2100, y: curY - 60, w: 300, h: 40 }); // Raised
                 spikes.push({ x: 2200, y: curY - 75, w: 100, h: 15 });
+                
+                platforms.push({ x: 2500, y: curY - 60, w: 400, h: 40 }); // Added platform for drone
                 enemies.push({ 
-                    x: 2500, y: curY - 150, w: 30, h: 30, vx: 1, 
-                    platform: { x: 2100, w: 600 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: 0.01 
+                    x: 2550, y: curY - 150, w: 30, h: 30, vx: DRONE_SPEED, 
+                    platform: { x: 2500, w: 400 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
                 });
                 platforms.push({ x: 3000, y: curY - 60, w: 200, h: 40, type: 'goal' });
 
@@ -479,13 +495,16 @@
                 platforms.push({ x: 1300, y: curY - 100, w: 300, h: 40 }); // Medium gap
                 lasers.push({ x: 1450, y: curY - 400, w: 16, h: 300, state: 'off', timer: 0, cycle: 240 }); // Vertical laser slowly
                 
+                platforms.push({ x: 1700, y: curY, w: 700, h: 40 }); // Missing platform
+                platforms.push({ x: 2100, y: curY - 100, w: 300, h: 40 }); // Extra platform to bridge the gap
+                
                 enemies.push({ 
-                    x: 1800, y: curY - 50, w: 30, h: 30, vx: 2, 
-                    platform: { x: 1700, w: 600 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: 0.02, hoverOffset: 50 
+                    x: 1800, y: curY - 50, w: 30, h: 30, vx: DRONE_SPEED, 
+                    platform: { x: 1700, w: 700 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
                 });
                 enemies.push({ 
-                    x: 2100, y: curY - 250, w: 30, h: 30, vx: -2, 
-                    platform: { x: 1700, w: 600 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: 0.02, hoverOffset: -150 
+                    x: 2100, y: curY - 250, w: 30, h: 30, vx: -DRONE_SPEED, 
+                    platform: { x: 1700, w: 700 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
                 });
 
                 // Staircase
@@ -535,12 +554,12 @@
                 platforms.push({ x: 2000, y: curY - 160, w: 150, h: 40 });
 
                 enemies.push({ 
-                    x: 2300, y: curY - 200, w: 30, h: 30, vx: 4, 
-                    platform: { x: 2100, w: 600 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.05 
+                    x: 2300, y: curY - 200, w: 30, h: 30, vx: DRONE_SPEED * 1.5, 
+                    platform: { x: 2100, w: 600 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
                 });
                 enemies.push({ 
-                    x: 2500, y: curY - 100, w: 30, h: 30, vx: -2, 
-                    platform: { x: 2100, w: 600 }, health: 3, type: 'shield', verticalTracking: true, trackSpeed: 0.03 
+                    x: 2500, y: curY - 100, w: 30, h: 30, vx: -DRONE_SPEED, 
+                    platform: { x: 2100, w: 600 }, health: 3, type: 'shield', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
                 });
 
                 platforms.push({ x: 2800, y: curY, w: 600, h: 40 });
@@ -566,9 +585,9 @@
                 // Long gap requiring dash
                 platforms.push({ x: 2800, y: curY, w: 1200, h: 150 });
                 
-                enemies.push({ x: 2900, y: curY - 100, w: 30, h: 30, vx: 5, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.06 });
-                enemies.push({ x: 3500, y: curY - 100, w: 30, h: 30, vx: -5, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.06 });
-                enemies.push({ x: 3200, y: curY - 50, w: 30, h: 30, vx: 0, platform: { x: 2800, w: 1200 }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: 0.04 });
+                enemies.push({ x: 2900, y: curY - 100, w: 30, h: 30, vx: DRONE_SPEED * 2, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
+                enemies.push({ x: 3500, y: curY - 100, w: 30, h: 30, vx: -DRONE_SPEED * 2, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
+                enemies.push({ x: 3200, y: curY - 50, w: 30, h: 30, vx: 0, platform: { x: 2800, w: 1200 }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
 
                 // Arena
                 platforms.push({ x: 2760, y: curY - 800, w: 40, h: 800, isWall: true });
@@ -595,22 +614,22 @@
 
             if (floor === 3) {
                 if (waveNum === 1) {
-                    enemies.push({ x: arenaX + 200, y: arenaY - 50, w: 30, h: 30, vx: 2, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, hoverOffset: 50 });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 30, h: 30, vx: -2, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, hoverOffset: -150 });
-                    enemies.push({ x: arenaX + 1000, y: arenaY - 400, w: 30, h: 30, vx: 2, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, hoverOffset: -300 });
+                    enemies.push({ x: arenaX + 200, y: arenaY - 50, w: 30, h: 30, vx: DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 30, h: 30, vx: -DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 1000, y: arenaY - 400, w: 30, h: 30, vx: DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
                 } else {
-                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 40, h: 40, vx: 4, platform: { x: arenaX, w: arenaW }, health: 5, type: 'drone', verticalTracking: true, trackSpeed: 0.08, isElite: true });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 40, h: 40, vx: DRONE_SPEED * 2, platform: { x: arenaX, w: arenaW }, health: 5, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 2, isElite: true });
                 }
             } else if (floor === 5) {
                 if (waveNum === 1) {
-                    enemies.push({ x: arenaX + 300, y: arenaY - 100, w: 30, h: 30, vx: 4, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.05 });
-                    enemies.push({ x: arenaX + 900, y: arenaY - 100, w: 30, h: 30, vx: -4, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.05 });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 50, w: 30, h: 30, vx: 0, platform: { x: arenaX, w: arenaW }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: 0.04 });
+                    enemies.push({ x: arenaX + 300, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 2, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
+                    enemies.push({ x: arenaX + 900, y: arenaY - 100, w: 30, h: 30, vx: -DRONE_SPEED * 2, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 50, w: 30, h: 30, vx: 0, platform: { x: arenaX, w: arenaW }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
                 } else {
-                    enemies.push({ x: arenaX + 200, y: arenaY - 100, w: 30, h: 30, vx: 3, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true });
-                    enemies.push({ x: arenaX + 500, y: arenaY - 100, w: 30, h: 30, vx: 3, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true });
-                    enemies.push({ x: arenaX + 800, y: arenaY - 100, w: 30, h: 30, vx: 3, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 300, w: 45, h: 45, vx: 6, platform: { x: arenaX, w: arenaW }, health: 8, type: 'drone', verticalTracking: true, trackSpeed: 0.1, isElite: true });
+                    enemies.push({ x: arenaX + 200, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 500, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 800, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 300, w: 45, h: 45, vx: DRONE_SPEED * 3, platform: { x: arenaX, w: arenaW }, health: 8, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 2.5, isElite: true });
                 }
             }
             showMsg("WAVE " + waveNum);
@@ -842,7 +861,10 @@
         }
 
         function takeDamage(amt, sourceX) {
+            if (invincibilityFrames > 0) return;
+            
             health -= amt * (player.damageResist || 1.0);
+            invincibilityFrames = 60; // 1 second at 60fps
             player.vy = -12;
             player.vx = (player.x < sourceX) ? -15 : 15;
             createParticles(player.x + player.w/2, player.y + player.h/2, varColor('--neon-pink'), 15);
@@ -856,6 +878,7 @@
         function update() {
             if (isTransitioning) return;
             frameCount++;
+            if (invincibilityFrames > 0) invincibilityFrames--;
 
             // Combat Logic
             if (player.isCharging) {
@@ -1125,11 +1148,24 @@
                         const targetY = player.y + (en.hoverOffset || 0);
                         const dy = targetY - en.y;
                         en.y += dy * (en.trackSpeed || 0.02);
+                        
+                        // Horizontal tracking
+                        const dx = player.x - en.x;
+                        if (Math.abs(dx) < 600) {
+                            en.vx += (dx > 0 ? 0.4 : -0.4);
+                            en.vx *= 0.9; // Tighter control
+                        }
                     }
                     
                     en.x += en.vx;
-                    if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
-                        en.vx *= -1;
+                    if (!en.verticalTracking) {
+                        if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
+                            en.vx *= -1;
+                        }
+                    } else {
+                        // Loose leash
+                        if (en.x < en.platform.x - 300) { en.x = en.platform.x - 300; en.vx *= -0.5; }
+                        if (en.x + en.w > en.platform.x + en.platform.w + 300) { en.x = en.platform.x + en.platform.w + 300 - en.w; en.vx *= -0.5; }
                     }
                 } else if (en.type === 'runner') {
                     const distToPlayer = Math.abs(player.x - en.x);
@@ -1335,69 +1371,46 @@
             }
             ctx.stroke();
 
-            // Buildings
+            // Buildings (Tower Background)
             buildings.forEach(b => {
                 const bx = (b.x + cameraX * b.parallax) % 5000;
                 const drawX = bx < -b.w ? bx + 5000 : bx;
                 const drawY = b.y + cameraY * b.parallax;
                 
-                // Building Body (Deep Black Silhouette)
-                ctx.fillStyle = '#000005';
-                ctx.fillRect(drawX, drawY, b.w, b.h);
-
-                // Building Outline (Vibrant Neon)
-                ctx.strokeStyle = b.color;
-                ctx.globalAlpha = b.glowIntensity;
-                ctx.lineWidth = 1.5;
-                
-                // Main Outline
-                ctx.strokeRect(drawX, drawY, b.w, b.h);
-                
-                // Neon Glow Layer
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = b.color;
-                ctx.strokeRect(drawX, drawY, b.w, b.h);
-                ctx.shadowBlur = 0;
-
-                // Antenna
-                if (b.hasAntenna) {
-                    ctx.beginPath();
-                    ctx.moveTo(drawX + b.w/2, drawY);
-                    ctx.lineTo(drawX + b.w/2, drawY - b.antennaHeight);
-                    ctx.stroke();
-                    // Tip glow
-                    if (frameCount % 30 < 15) {
-                        ctx.fillStyle = b.color;
-                        ctx.shadowBlur = 25;
-                        ctx.shadowColor = b.color;
-                        ctx.beginPath();
-                        ctx.arc(drawX + b.w/2, drawY - b.antennaHeight, 5, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.shadowBlur = 0;
-                    }
-                }
-
-                // Neon Sign (Billboard)
-                if (b.hasSign) {
+                if (b.isCore) {
                     ctx.fillStyle = b.color;
-                    ctx.globalAlpha = 0.6;
-                    ctx.fillRect(drawX + 10, drawY + 20, b.w - 20, 40);
-                    ctx.globalAlpha = 1.0;
-                    ctx.strokeStyle = '#fff';
+                    ctx.fillRect(drawX, drawY, b.w, b.h);
+                    
+                    ctx.fillStyle = 'rgba(0, 242, 255, 0.1)';
+                    b.windows.forEach(w => {
+                        if (w.on) {
+                            ctx.fillRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
+                        }
+                    });
+                } else if (b.isBeam) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = b.glowColor;
+                    ctx.strokeStyle = b.glowColor;
                     ctx.lineWidth = 1;
-                    ctx.strokeRect(drawX + 10, drawY + 20, b.w - 20, 40);
+                    ctx.strokeRect(drawX, drawY, b.w, b.h);
+                    ctx.shadowBlur = 0;
                 }
-
-                // Windows
-                ctx.fillStyle = b.color;
-                b.windows.forEach(w => {
-                    if (w.on) {
-                        ctx.globalAlpha = 0.5 + b.parallax * 0.4;
-                        ctx.fillRect(drawX + w.x * b.w, drawY + w.y * 1800, w.w * b.w, w.h * 1800);
-                    }
-                });
-                ctx.globalAlpha = 1.0;
             });
+
+            // Tower Walls (Foreground Parallax)
+            ctx.fillStyle = '#050510';
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 5;
+            const wallWidth = 100;
+            const wallParallax = 0.1;
+            const wallX = (-cameraX * wallParallax) % 2000;
+            for(let i = -1; i < 3; i++) {
+                const x = wallX + i * 2000;
+                ctx.fillRect(x, 0, wallWidth, height);
+                ctx.strokeRect(x, 0, wallWidth, height);
+                ctx.fillRect(x + 1900, 0, wallWidth, height);
+                ctx.strokeRect(x + 1900, 0, wallWidth, height);
+            }
 
             ctx.save();
             ctx.translate(cameraX, cameraY);

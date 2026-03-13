@@ -115,9 +115,8 @@
 
         #hotbar {
             position: absolute;
-            bottom: 140px;
-            left: 50%;
-            transform: translateX(-50%);
+            bottom: 30px;
+            left: 30px;
             display: flex;
             gap: 15px;
             z-index: 100;
@@ -222,8 +221,8 @@
 <body>
     <div id="ui">
         <div class="stat-box" id="sector-box">
-            <div class="label">SECTOR</div>
-            <div class="value">0<span id="sector-val">1</span></div>
+            <div class="label">FLOOR</div>
+            <div class="value"><span id="sector-val">01</span></div>
             <div class="health-bar-container">
                 <div id="health-bar"></div>
                 <div id="charge-bar"></div>
@@ -235,7 +234,7 @@
         </div>
     </div>
     
-    <div id="message">SECTOR CLEAR</div>
+    <div id="message">FLOOR CLEAR</div>
     <button id="shop-btn">NEON SHOP</button>
 
     <div id="hotbar" style="display: none;">
@@ -358,7 +357,7 @@
         const PLAYER_SIZE_H = 30;
 
         // Game State
-        let sector = 1;
+        let floor = 1;
         let health = 100;
         let pixelCoins = 0;
         let player = { 
@@ -391,6 +390,9 @@
         let arenaCleared = false;
         let waveTransition = false;
         let showShop = false;
+        let coinsAtArenaStart = 0;
+        let isElevatorRising = false;
+        let elevatorY = 0;
         let shopItems = [
             { name: 'NEON BOW', price: 100, desc: 'RANGED WEAPON', action: () => { player.hasBow = true; player.weapon = 'bow'; updateHotbar(); } },
             { name: 'POWER CORE', price: 100, desc: 'FASTER CHARGE', action: () => { player.chargeSpeed = 2; } },
@@ -441,7 +443,7 @@
             }
         }
 
-        function generateSector(num) {
+        function generateFloor(num) {
             platforms = [];
             spikes = [];
             lasers = [];
@@ -451,182 +453,167 @@
             coins = [];
             arenaActive = false;
             waveTransition = false;
+            arenaCleared = false;
             
             let curX = 0;
             let curY = height - 150;
 
             if (num === 1) {
-                // Level 1 — Movement Basics and Safe Obstacles
-                // Starting platform
-                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
-                curX = 400;
-
-                // Straightforward layout with small jumps
-                platforms.push({ x: 600, y: curY, w: 200, h: 40 });
-                platforms.push({ x: 900, y: curY - 50, w: 200, h: 40 });
-
-                // Introduce double jump with a clear gap
-                platforms.push({ x: 1400, y: curY, w: 300, h: 40 }); // Gap of 300
-
-                // First obstacle: stationary spikes in obvious spots
-                platforms.push({ x: 1900, y: curY, w: 400, h: 40 });
-                spikes.push({ x: 2050, y: curY - 15, w: 100, h: 15 });
-
-                // One simple drone at the end to teach short-tap attack
-                platforms.push({ x: 2500, y: curY, w: 500, h: 40 });
-                enemies.push({
-                    x: 2750, y: curY - 40, w: 30, h: 30, vx: 0,
-                    platform: { x: 2500, w: 500 }, health: 1, type: 'drone'
+                // Floor 1: Lobby
+                platforms.push({ x: -200, y: curY, w: 1000, h: 150 });
+                platforms.push({ x: 950, y: curY, w: 300, h: 40 }); // Small gap
+                platforms.push({ x: 1650, y: curY, w: 300, h: 40 }); // Large gap
+                platforms.push({ x: 2100, y: curY - 60, w: 300, h: 40 }); // Raised
+                spikes.push({ x: 2200, y: curY - 75, w: 100, h: 15 });
+                enemies.push({ 
+                    x: 2500, y: curY - 150, w: 30, h: 30, vx: 1, 
+                    platform: { x: 2100, w: 600 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: 0.01 
                 });
-
-                // Goal
-                platforms.push({ x: 3200, y: curY, w: 200, h: 40, type: 'goal' });
+                platforms.push({ x: 3000, y: curY - 60, w: 200, h: 40, type: 'goal' });
 
             } else if (num === 2) {
-                // Level 2 — Timing Introduced (Lasers + Simple Combat)
+                // Floor 2: Maintenance Floor
                 platforms.push({ x: -200, y: curY, w: 600, h: 150 });
-                curX = 400;
-
-                // Introduce lasers with slow cycles
-                platforms.push({ x: 700, y: curY, w: 300, h: 40 });
-                lasers.push({ x: 850, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 180 });
-
-                // Slightly longer gaps and vertical jumps
-                platforms.push({ x: 1200, y: curY - 100, w: 200, h: 40 });
-                platforms.push({ x: 1500, y: curY - 250, w: 200, h: 40 });
-
-                // Two drones spaced apart
-                platforms.push({ x: 1900, y: curY - 100, w: 400, h: 40 });
-                enemies.push({ x: 2000, y: curY - 140, w: 30, h: 30, vx: 2, platform: { x: 1900, w: 400 }, health: 1, type: 'drone' });
+                lasers.push({ x: 600, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 120 }); // Horizontal laser (cycles every 2s at 60fps)
+                platforms.push({ x: 800, y: curY, w: 300, h: 40 });
+                platforms.push({ x: 1300, y: curY - 100, w: 300, h: 40 }); // Medium gap
+                lasers.push({ x: 1450, y: curY - 400, w: 16, h: 300, state: 'off', timer: 0, cycle: 240 }); // Vertical laser slowly
                 
-                platforms.push({ x: 2500, y: curY - 150, w: 400, h: 40 });
-                enemies.push({ x: 2700, y: curY - 190, w: 30, h: 30, vx: 2, platform: { x: 2500, w: 400 }, health: 1, type: 'drone' });
+                enemies.push({ 
+                    x: 1800, y: curY - 50, w: 30, h: 30, vx: 2, 
+                    platform: { x: 1700, w: 600 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: 0.02, hoverOffset: 50 
+                });
+                enemies.push({ 
+                    x: 2100, y: curY - 250, w: 30, h: 30, vx: -2, 
+                    platform: { x: 1700, w: 600 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: 0.02, hoverOffset: -150 
+                });
 
-                // Section where player must wait for laser cycle
-                platforms.push({ x: 3100, y: curY, w: 600, h: 40 });
-                lasers.push({ x: 3300, y: curY - 300, w: 16, h: 300, state: 'off', timer: 60, cycle: 180 });
-                lasers.push({ x: 3500, y: curY - 300, w: 16, h: 300, state: 'off', timer: 120, cycle: 180 });
-
-                // Goal
-                platforms.push({ x: 3900, y: curY, w: 200, h: 40, type: 'goal' });
+                // Staircase
+                platforms.push({ x: 2500, y: curY, w: 150, h: 40 });
+                platforms.push({ x: 2650, y: curY - 60, w: 150, h: 40 });
+                platforms.push({ x: 2800, y: curY - 120, w: 150, h: 40 });
+                platforms.push({ x: 3000, y: curY - 120, w: 200, h: 40, type: 'goal' });
 
             } else if (num === 3) {
-                // Level 3 — First Real Flow Level
+                // Floor 3: Service Shaft
                 platforms.push({ x: -200, y: curY, w: 600, h: 150 });
-                curX = 400;
-
-                // Faster laser cycles
-                platforms.push({ x: 700, y: curY, w: 300, h: 40 });
-                lasers.push({ x: 850, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 100 });
-
-                // Moving platforms for vertical control
-                platforms.push({ x: 1200, y: curY, w: 200, h: 40, type: 'moving', startY: curY, range: 200, speed: 0.03 });
+                // Narrow corridor (implied by low ceiling if we had one, but we'll use tight platforms)
+                platforms.push({ x: 500, y: curY, w: 400, h: 40 });
+                crushers.push({ x: 650, y: curY - 300, w: 80, h: 100, startY: curY - 300, targetY: curY - 80, state: 'waiting', timer: 0, speed: 2 });
                 
-                platforms.push({ x: 1600, y: curY - 200, w: 300, h: 40 });
-                spikes.push({ x: 1700, y: curY - 215, w: 100, h: 15 });
+                platforms.push({ x: 1100, y: curY - 100, w: 200, h: 40 }); // Medium gap
+                platforms.push({ x: 1500, y: curY, w: 200, h: 40, type: 'moving', startY: curY, range: 150, speed: 0.04 }); // Moving platform over pit
+                
+                platforms.push({ x: 1900, y: curY, w: 600, h: 40 });
+                lasers.push({ x: 2100, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 120 });
+                lasers.push({ x: 2300, y: curY - 300, w: 16, h: 300, state: 'off', timer: 60, cycle: 120 });
 
-                platforms.push({ x: 2100, y: curY - 100, w: 200, h: 40, type: 'moving', startY: curY - 100, range: 150, speed: 0.05 });
-
-                // Mix of everything
-                platforms.push({ x: 2500, y: curY - 250, w: 400, h: 40 });
-                lasers.push({ x: 2700, y: curY - 550, w: 16, h: 300, state: 'off', timer: 30, cycle: 90 });
-                enemies.push({ x: 2600, y: curY - 290, w: 30, h: 30, vx: 3, platform: { x: 2500, w: 400 }, health: 1, type: 'drone' });
-
-                // Goal
-                platforms.push({ x: 3200, y: curY - 250, w: 200, h: 40, type: 'goal' });
-
-            } else if (num === 4) {
-                // Sector 4 — Wave Fight Arena
-                showMsg("ARENA ENTERED - PREPARE FOR BLADE RUNNERS");
+                // Arena
+                platforms.push({ x: 2700, y: curY, w: 1200, h: 150 });
+                platforms.push({ x: 2660, y: curY - 800, w: 40, h: 800, isWall: true });
+                platforms.push({ x: 3900, y: curY - 800, w: 40, h: 800, isWall: true });
+                
+                arenaActive = true;
                 currentWave = 1;
                 totalWaves = 2;
-                arenaActive = true;
-                arenaCleared = false;
-                // Large flat arena
-                platforms.push({ x: -500, y: curY, w: 2000, h: 150 });
-                // Walls
-                platforms.push({ x: -540, y: curY - 800, w: 40, h: 800, isWall: true });
-                platforms.push({ x: 1500, y: curY - 800, w: 40, h: 800, isWall: true });
+                coinsAtArenaStart = coins_collected;
+                spawnWave(currentWave);
+
+            } else if (num === 4) {
+                // Floor 4: Reactor Access
+                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
+                platforms.push({ x: 500, y: curY - 50, w: 150, h: 40 }); // Short hop
+                lasers.push({ x: 750, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 90 }); // Fast laser (1.5s)
                 
+                platforms.push({ x: 900, y: curY, w: 400, h: 40 });
+                crushers.push({ x: 1050, y: curY - 300, w: 80, h: 100, startY: curY - 300, targetY: curY - 80, state: 'waiting', timer: 0, speed: 5 });
+                lasers.push({ x: 1082, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 120, syncWithCrusher: true });
+
+                // Rhythm jump sequence
+                platforms.push({ x: 1500, y: curY, w: 80, h: 40 });
+                platforms.push({ x: 1750, y: curY - 80, w: 80, h: 40 });
+                platforms.push({ x: 2000, y: curY - 160, w: 150, h: 40 });
+
+                enemies.push({ 
+                    x: 2300, y: curY - 200, w: 30, h: 30, vx: 4, 
+                    platform: { x: 2100, w: 600 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.05 
+                });
+                enemies.push({ 
+                    x: 2500, y: curY - 100, w: 30, h: 30, vx: -2, 
+                    platform: { x: 2100, w: 600 }, health: 3, type: 'shield', verticalTracking: true, trackSpeed: 0.03 
+                });
+
+                platforms.push({ x: 2800, y: curY, w: 600, h: 40 });
+                spikes.push({ x: 2900, y: curY - 15, w: 400, h: 15 });
+                platforms.push({ x: 3500, y: curY, w: 200, h: 40, type: 'goal' });
+
+            } else if (num === 5) {
+                // Floor 5: Security Floor
+                platforms.push({ x: -200, y: curY, w: 600, h: 150 });
+                platforms.push({ x: 500, y: curY - 200, w: 200, h: 40 }); // Immediate double jump
+                
+                // Vertical laser grid
+                platforms.push({ x: 850, y: curY - 200, w: 60, h: 40 }); // Tiny platform
+                lasers.push({ x: 800, y: curY - 500, w: 16, h: 500, state: 'off', timer: 0, cycle: 120 });
+                lasers.push({ x: 872, y: curY - 500, w: 16, h: 500, state: 'off', timer: 40, cycle: 120 });
+                lasers.push({ x: 944, y: curY - 500, w: 16, h: 500, state: 'off', timer: 80, cycle: 120 });
+
+                platforms.push({ x: 1100, y: curY, w: 800, h: 40 });
+                crushers.push({ x: 1300, y: curY - 300, w: 80, h: 100, startY: curY - 300, targetY: curY - 80, state: 'waiting', timer: 0 });
+                crushers.push({ x: 1600, y: curY - 300, w: 80, h: 100, startY: curY - 300, targetY: curY - 80, state: 'waiting', timer: 60 });
+
+                platforms.push({ x: 2100, y: curY, w: 200, h: 40 });
+                // Long gap requiring dash
+                platforms.push({ x: 2800, y: curY, w: 1200, h: 150 });
+                
+                enemies.push({ x: 2900, y: curY - 100, w: 30, h: 30, vx: 5, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.06 });
+                enemies.push({ x: 3500, y: curY - 100, w: 30, h: 30, vx: -5, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.06 });
+                enemies.push({ x: 3200, y: curY - 50, w: 30, h: 30, vx: 0, platform: { x: 2800, w: 1200 }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: 0.04 });
+
+                // Arena
+                platforms.push({ x: 2760, y: curY - 800, w: 40, h: 800, isWall: true });
+                platforms.push({ x: 4000, y: curY - 800, w: 40, h: 800, isWall: true });
+                
+                arenaActive = true;
+                currentWave = 1;
+                totalWaves = 2;
+                coinsAtArenaStart = coins_collected;
                 spawnWave(currentWave);
             } else {
-                // Procedural for Sector 5+
+                // Procedural fallback
                 platforms.push({ x: -200, y: curY, w: 600, h: 150 });
-                curX = 400;
-                const sectorLength = 10 + num * 2;
-                for(let i = 0; i < sectorLength; i++) {
-                    const gap = 130 + Math.random() * 120;
-                    const w = 150 + Math.random() * 300;
-                    if (Math.random() > 0.4) spikes.push({ x: curX, y: curY + 150, w: gap, h: 20 });
-                    curX += gap;
-                    const dy = (Math.random() - 0.5) * 120;
-                    curY += dy;
-                    curY = Math.max(height * 0.2, Math.min(height * 0.85, curY));
-
-                    let type = 'normal';
-                    let extra = {};
-                    if (num >= 4 && Math.random() > 0.5) {
-                        type = 'moving';
-                        extra = { startY: curY, range: 150, speed: 0.02 + Math.random() * 0.02 };
-                    } else if (num >= 5 && Math.random() > 0.6) {
-                        type = 'fading';
-                        extra = { opacity: 1 };
-                    }
-
-                    platforms.push({ x: curX, y: curY, w: w, h: 40, type, ...extra });
-                    if (Math.random() > (num >= 3 ? 0.4 : 0.6) && type === 'normal') {
-                        const maxSpikeW = Math.max(20, w - 120);
-                        const spikeW = 30 + Math.random() * maxSpikeW;
-                        spikes.push({ x: curX + w - spikeW - 10, y: curY - 15, w: spikeW, h: 15 });
-                    }
-                    if (num >= 6 && Math.random() > 0.6) {
-                        saws.push({ x: curX + w/2, y: curY - 100, r: 30, angle: 0, speed: 0.05, range: 100, startX: curX + w/2 });
-                    }
-                    if (num >= 4 && Math.random() > 0.7) {
-                        crushers.push({ x: curX + w/2 - 40, y: curY - 400, w: 80, h: 100, startY: curY - 400, targetY: curY - 80, state: 'waiting', timer: Math.random() * 60 });
-                    }
-                    if (num >= 3 && Math.random() > 0.3) {
-                        enemies.push({ x: curX + w/2, y: curY - 40, w: 30, h: 30, vx: num >= 4 ? 3 : 2, platform: { x: curX, w: w }, health: 1, type: 'drone' });
-                    }
-                    if (num >= 2 && Math.random() > (num >= 3 ? 0.4 : 0.6)) {
-                        lasers.push({ x: curX + 10, y: curY - 300, w: 12, h: 300, state: 'off', timer: Math.random() * 120, cycle: 120 });
-                    }
-                    curX += w;
-                }
-                // Vertical climb at end
-                const endX = curX;
-                const climbHeight = 150;
-                for(let i = 0; i < 8; i++) {
-                    const px = endX + (i % 2 === 0 ? 30 : 260);
-                    const py = curY - (i + 1) * climbHeight;
-                    let type = 'normal';
-                    if (num > 1 && i > 4 && Math.random() > 0.5) type = 'fading';
-                    platforms.push({ x: px, y: py, w: 180, h: 30, type });
-                    if (i === 7) platforms.push({ x: px - 40, y: py - 200, w: 260, h: 40, type: 'goal' });
-                }
+                platforms.push({ x: 1000, y: curY, w: 200, h: 40, type: 'goal' });
             }
         }
 
         function spawnWave(waveNum) {
             enemies = [];
             waveTransition = false;
-            const count = waveNum === 1 ? 2 : 3;
             const arenaY = height - 150;
-            for(let i = 0; i < count; i++) {
-                enemies.push({
-                    x: -200 + Math.random() * 1400,
-                    y: arenaY - 40,
-                    w: 30, h: 30,
-                    vx: 0,
-                    platform: { x: -500, w: 2000 },
-                    health: 1,
-                    type: 'runner',
-                    state: 'idle',
-                    timer: -90, // Cooldown on spawn
-                    facing: 1
-                });
+            const arenaX = floor === 3 ? 2700 : 2800;
+            const arenaW = 1200;
+
+            if (floor === 3) {
+                if (waveNum === 1) {
+                    enemies.push({ x: arenaX + 200, y: arenaY - 50, w: 30, h: 30, vx: 2, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, hoverOffset: 50 });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 30, h: 30, vx: -2, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, hoverOffset: -150 });
+                    enemies.push({ x: arenaX + 1000, y: arenaY - 400, w: 30, h: 30, vx: 2, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, hoverOffset: -300 });
+                } else {
+                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 40, h: 40, vx: 4, platform: { x: arenaX, w: arenaW }, health: 5, type: 'drone', verticalTracking: true, trackSpeed: 0.08, isElite: true });
+                }
+            } else if (floor === 5) {
+                if (waveNum === 1) {
+                    enemies.push({ x: arenaX + 300, y: arenaY - 100, w: 30, h: 30, vx: 4, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.05 });
+                    enemies.push({ x: arenaX + 900, y: arenaY - 100, w: 30, h: 30, vx: -4, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: 0.05 });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 50, w: 30, h: 30, vx: 0, platform: { x: arenaX, w: arenaW }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: 0.04 });
+                } else {
+                    enemies.push({ x: arenaX + 200, y: arenaY - 100, w: 30, h: 30, vx: 3, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true });
+                    enemies.push({ x: arenaX + 500, y: arenaY - 100, w: 30, h: 30, vx: 3, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true });
+                    enemies.push({ x: arenaX + 800, y: arenaY - 100, w: 30, h: 30, vx: 3, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 300, w: 45, h: 45, vx: 6, platform: { x: arenaX, w: arenaW }, health: 8, type: 'drone', verticalTracking: true, trackSpeed: 0.1, isElite: true });
+                }
             }
-            showMsg("WAVE " + waveNum + " - BLADE RUNNERS");
+            showMsg("WAVE " + waveNum);
         }
 
         function resetPlayer() {
@@ -650,27 +637,32 @@
             if (chargeBar) chargeBar.style.width = '0%';
             isTransitioning = false;
             transitionAlpha = 0;
-            if (sector === 4) {
-                currentWave = 1;
-                arenaActive = true;
-                arenaCleared = false;
-                waveTransition = false;
+            isElevatorRising = false;
+            
+            if (arenaActive) {
+                coins_collected = coinsAtArenaStart;
+                const coinVal = document.getElementById('coin-val');
+                if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
                 spawnWave(currentWave);
             }
         }
 
-        function advanceSector() {
+        function advanceFloor() {
             if (isTransitioning) return;
             isTransitioning = true;
-            showMsg("ASCENDING TO SECTOR " + (sector + 1));
+            isElevatorRising = true;
+            elevatorY = 0;
+            showMsg("ASCENDING TO FLOOR " + (floor + 1));
             
             let fadeOut = setInterval(() => {
-                transitionAlpha += 0.04;
+                transitionAlpha += 0.02;
+                elevatorY -= 10;
                 if (transitionAlpha >= 1) {
                     clearInterval(fadeOut);
-                    sector++;
-                    if (sectorVal) sectorVal.innerText = sector < 10 ? '0' + sector : sector;
-                    generateSector(sector);
+                    floor++;
+                    const sectorVal = document.getElementById('sector-val');
+                    if (sectorVal) sectorVal.innerText = floor < 10 ? '0' + floor : floor;
+                    generateFloor(floor);
                     resetPlayer();
                 }
             }, 30);
@@ -909,7 +901,7 @@
             }
 
             // Arena Logic
-            if (arenaActive && sector === 4) {
+            if (arenaActive) {
                 if (enemies.length === 0 && !waveTransition) {
                     if (currentWave < totalWaves) {
                         waveTransition = true;
@@ -922,13 +914,14 @@
                         // Remove walls
                         platforms = platforms.filter(p => !p.isWall);
                         // Add goal platform
-                        platforms.push({ x: 2300, y: height - 150, w: 200, h: 40, type: 'goal' });
+                        const arenaX = floor === 3 ? 2700 : 2800;
+                        platforms.push({ x: arenaX + 1100, y: height - 150, w: 200, h: 40, type: 'goal' });
                     }
                 }
             }
             
             // Shop Interaction
-            if (sector === 4 && arenaCleared) {
+            if (arenaCleared || floor >= 3) {
                 if (shopBtn) shopBtn.style.display = 'block';
             } else {
                 if (shopBtn) shopBtn.style.display = 'none';
@@ -937,6 +930,10 @@
             
             player.x += player.vx;
             player.y += player.vy;
+
+            if (isElevatorRising) {
+                player.y -= 10;
+            }
 
             // Update Platforms
             platforms.forEach(p => {
@@ -1021,10 +1018,17 @@
 
             // Update Lasers
             lasers.forEach(l => {
-                l.timer++;
-                if (l.timer > 90) {
-                    l.state = l.state === 'on' ? 'off' : 'on';
-                    l.timer = 0;
+                if (l.syncWithCrusher) {
+                    const crusher = crushers.find(c => Math.abs(c.x - (l.x - 32)) < 10);
+                    if (crusher) {
+                        l.state = crusher.state === 'waiting' ? 'on' : 'off';
+                    }
+                } else {
+                    l.timer++;
+                    if (l.timer >= l.cycle) {
+                        l.timer = 0;
+                        l.state = l.state === 'on' ? 'off' : 'on';
+                    }
                 }
             });
 
@@ -1034,7 +1038,7 @@
                     c.timer++;
                     if (c.timer > 60) { c.state = 'dropping'; c.timer = 0; }
                 } else if (c.state === 'dropping') {
-                    c.y += 18;
+                    c.y += (c.speed || 18);
                     if (c.y >= c.targetY) { c.y = c.targetY; c.state = 'rising'; }
                 } else if (c.state === 'rising') {
                     c.y -= 2.5;
@@ -1063,7 +1067,7 @@
                         player.jumps = 0;
 
                         if (p.type === 'fading') p.opacity -= 0.08;
-                        if (p.type === 'goal') advanceSector();
+                        if (p.type === 'goal') advanceFloor();
                     } 
                     else if (player.vx > 0 && player.x + player.w - player.vx <= p.x) {
                         player.x = p.x - player.w; player.vx = 0;
@@ -1113,6 +1117,69 @@
             // Enemy Collision & Combat
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const en = enemies[i];
+                
+                // AI Logic
+                if (en.type === 'drone' || en.type === 'shield') {
+                    // Vertical tracking
+                    if (en.verticalTracking) {
+                        const targetY = player.y + (en.hoverOffset || 0);
+                        const dy = targetY - en.y;
+                        en.y += dy * (en.trackSpeed || 0.02);
+                    }
+                    
+                    en.x += en.vx;
+                    if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
+                        en.vx *= -1;
+                    }
+                } else if (en.type === 'runner') {
+                    const distToPlayer = Math.abs(player.x - en.x);
+                    const sameLevel = Math.abs(player.y - en.y) < 100;
+
+                    if (en.state === 'idle') {
+                        en.timer++;
+                        if (en.timer > 30) {
+                            en.state = 'sprinting';
+                            en.timer = 0;
+                        }
+                    } else if (en.state === 'sprinting') {
+                        const dir = player.x < en.x ? -1 : 1;
+                        en.facing = dir;
+                        en.vx = dir * 5;
+                        en.x += en.vx;
+                        
+                        if (distToPlayer < 200 && sameLevel) {
+                            en.state = 'preparing';
+                            en.timer = 0;
+                            en.vx = 0;
+                        }
+                    } else if (en.state === 'preparing') {
+                        en.timer++;
+                        if (en.timer > 35) {
+                            en.state = 'dashing';
+                            en.timer = 0;
+                        }
+                    } else if (en.state === 'dashing') {
+                        en.vx = en.facing * 15;
+                        en.x += en.vx;
+                        en.timer++;
+                        if (en.timer > 15) {
+                            en.state = 'cooldown';
+                            en.timer = 0;
+                        }
+                    } else if (en.state === 'cooldown') {
+                        en.vx = 0;
+                        en.timer++;
+                        if (en.timer > 40) {
+                            en.state = 'idle';
+                            en.timer = 0;
+                        }
+                    }
+                    
+                    // Keep on platform
+                    if (en.x < en.platform.x) en.x = en.platform.x;
+                    if (en.x + en.w > en.platform.x + en.platform.w) en.x = en.platform.x + en.platform.w - en.w;
+                }
+
                 // Player hits enemy
                 if (player.isAttacking || player.isDashing) {
                     const attackRange = player.isDashing ? 80 : 70;
@@ -1121,9 +1188,19 @@
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     
                     // More forgiving hitbox for drones
-                    const hitRange = en.type === 'drone' ? attackRange + 20 : attackRange;
+                    const hitRange = (en.type === 'drone' || en.type === 'shield') ? attackRange + 20 : attackRange;
                     
                     if (dist < hitRange) {
+                        // Shield check
+                        if (en.type === 'shield') {
+                            const playerBehind = (en.vx > 0 && player.x > en.x) || (en.vx < 0 && player.x < en.x);
+                            if (!playerBehind) {
+                                createParticles(en.x + en.w/2, en.y + en.h/2, '#555', 5);
+                                player.vx = -player.facing * 10; // Strong recoil
+                                continue;
+                            }
+                        }
+
                         const isDashHit = player.isDashing;
                         const damage = isDashHit ? 2 : 1;
                         
@@ -1148,7 +1225,7 @@
                 if (player.x + player.w > en.x && player.x < en.x + en.w &&
                     player.y + player.h > en.y && player.y < en.y + en.h) {
                     if (!player.isDashing) {
-                        if (en.type === 'drone') {
+                        if (en.type === 'drone' || en.type === 'shield') {
                             takeDamage(10, en.x);
                         } else if (en.type === 'runner' && en.state === 'dashing') {
                             takeDamage(10, en.x);
@@ -1176,11 +1253,21 @@
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     const en = enemies[j];
                     if (a.x > en.x && a.x < en.x + en.w && a.y > en.y && a.y < en.y + en.h) {
+                        // Shield check
+                        if (en.type === 'shield') {
+                            const arrowFromFront = (a.vx > 0 && a.x < en.x + en.w/2) || (a.vx < 0 && a.x > en.x + en.w/2);
+                            if (arrowFromFront) {
+                                createParticles(a.x, a.y, '#555', 5);
+                                arrows.splice(i, 1);
+                                break;
+                            }
+                        }
+
                         en.health -= a.damage;
                         createParticles(a.x, a.y, varColor('--neon-cyan'), 10);
                         if (en.health <= 0) {
                             createParticles(en.x + en.w/2, en.y + en.h/2, varColor('--neon-cyan'), 15);
-                            coins_collected += 10;
+                            coins_collected += en.isElite ? 50 : 10;
                             const coinVal = document.getElementById('coin-val');
                             if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
                             enemies.splice(j, 1);
@@ -1321,20 +1408,24 @@
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
                     ctx.strokeStyle = '#fff';
                     ctx.lineWidth = 3;
-                    ctx.fillRect(p.x, p.y, p.w, p.h);
-                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                    
+                    const elevX = p.x;
+                    const elevY = p.y + (isElevatorRising ? elevatorY : 0);
+                    
+                    ctx.fillRect(elevX, elevY, p.w, p.h);
+                    ctx.strokeRect(elevX, elevY, p.w, p.h);
                     
                     // Shaft visual
                     ctx.beginPath();
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                    ctx.moveTo(p.x, p.y); ctx.lineTo(p.x, p.y - 1000);
-                    ctx.moveTo(p.x + p.w, p.y); ctx.lineTo(p.x + p.w, p.y - 1000);
+                    ctx.moveTo(elevX, elevY); ctx.lineTo(elevX, elevY - 1000);
+                    ctx.moveTo(elevX + p.w, elevY); ctx.lineTo(elevX + p.w, elevY - 1000);
                     ctx.stroke();
 
                     ctx.fillStyle = '#fff';
                     ctx.font = 'bold 16px Orbitron';
                     ctx.textAlign = 'center';
-                    ctx.fillText('ASCEND', p.x + p.w/2, p.y + 25);
+                    ctx.fillText('ASCEND', elevX + p.w/2, elevY + 25);
                 } else if (p.type === 'block') {
                     ctx.fillStyle = '#111';
                     ctx.strokeStyle = varColor('--neon-cyan');
@@ -1474,19 +1565,25 @@
 
             // Enemies
             enemies.forEach(en => {
-                if (en.type === 'drone') {
+                if (en.type === 'drone' || en.type === 'shield') {
                     ctx.fillStyle = '#000';
-                    ctx.strokeStyle = varColor('--neon-pink');
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = en.isElite ? varColor('--neon-cyan') : varColor('--neon-pink');
+                    ctx.lineWidth = en.isElite ? 4 : 2;
                     ctx.strokeRect(en.x, en.y, en.w, en.h);
                     
+                    if (en.type === 'shield') {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        if (en.vx > 0) ctx.fillRect(en.x, en.y, 5, en.h);
+                        else ctx.fillRect(en.x + en.w - 5, en.y, 5, en.h);
+                    }
+
                     // Eye
-                    ctx.fillStyle = varColor('--neon-pink');
-                    ctx.fillRect(en.x + (en.vx > 0 ? 20 : 5), en.y + 10, 5, 5);
+                    ctx.fillStyle = en.isElite ? varColor('--neon-cyan') : varColor('--neon-pink');
+                    ctx.fillRect(en.x + (en.vx > 0 ? en.w - 10 : 5), en.y + 10, 5, 5);
                     
                     // Glow
                     ctx.shadowBlur = 10;
-                    ctx.shadowColor = varColor('--neon-pink');
+                    ctx.shadowColor = en.isElite ? varColor('--neon-cyan') : varColor('--neon-pink');
                     ctx.strokeRect(en.x, en.y, en.w, en.h);
                     ctx.shadowBlur = 0;
                 } else if (en.type === 'runner') {
@@ -1717,7 +1814,7 @@
 
         initStars();
         initBuildings();
-        generateSector(1);
+        generateFloor(1);
         resetPlayer();
         loop();
     </script>

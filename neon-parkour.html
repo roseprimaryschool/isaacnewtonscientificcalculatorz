@@ -510,10 +510,10 @@
             } else if (num === 2) {
                 // Floor 2: Maintenance Floor
                 platforms.push({ x: -200, y: curY, w: 600, h: 150 });
-                lasers.push({ x: 600, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 120 }); // Horizontal laser (cycles every 2s at 60fps)
+                lasers.push({ x: 600, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 80 }); // Faster cycle
                 platforms.push({ x: 800, y: curY, w: 300, h: 40 });
                 platforms.push({ x: 1300, y: curY - 100, w: 300, h: 40 }); // Medium gap
-                lasers.push({ x: 1450, y: curY - 400, w: 16, h: 300, state: 'off', timer: 0, cycle: 240 }); // Vertical laser slowly
+                lasers.push({ x: 1450, y: curY - 400, w: 16, h: 300, state: 'off', timer: 0, cycle: 160 }); // Faster cycle
                 
                 platforms.push({ x: 1700, y: curY, w: 700, h: 40 }); // Missing platform
                 platforms.push({ x: 2100, y: curY - 100, w: 300, h: 40 }); // Extra platform to bridge the gap
@@ -544,15 +544,15 @@
                 platforms.push({ x: 1500, y: curY, w: 200, h: 40, type: 'moving', startY: curY, range: 150, speed: 0.04 }); // Moving platform over pit
                 
                 platforms.push({ x: 1900, y: curY, w: 600, h: 40 });
-                lasers.push({ x: 2100, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 120 });
-                lasers.push({ x: 2300, y: curY - 300, w: 16, h: 300, state: 'off', timer: 60, cycle: 120 });
+                lasers.push({ x: 2100, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 90 });
+                lasers.push({ x: 2300, y: curY - 300, w: 16, h: 300, state: 'off', timer: 45, cycle: 90 });
 
                 // Arena
                 platforms.push({ x: 2700, y: curY, w: 1200, h: 150 });
                 
                 pendingArena = {
-                    triggerX: 2800,
-                    startX: 2700,
+                    triggerX: 2950, // Trigger deeper into the arena
+                    startX: 2660,   // Wall slightly before the platform start
                     endX: 3900,
                     y: curY,
                     waves: 2
@@ -566,11 +566,11 @@
                 // Floor 4: Reactor Access
                 platforms.push({ x: -200, y: curY, w: 600, h: 150 });
                 platforms.push({ x: 500, y: curY - 50, w: 150, h: 40 }); // Short hop
-                lasers.push({ x: 750, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 90 }); // Fast laser (1.5s)
+                lasers.push({ x: 750, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 70 }); // Faster
                 
                 platforms.push({ x: 900, y: curY, w: 400, h: 40 });
                 crushers.push({ x: 1050, y: curY - 300, w: 80, h: 100, startY: curY - 300, targetY: curY - 80, state: 'waiting', timer: 0, speed: 5 });
-                lasers.push({ x: 1082, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 120, syncWithCrusher: true });
+                lasers.push({ x: 1082, y: curY - 300, w: 16, h: 300, state: 'off', timer: 0, cycle: 90, syncWithCrusher: true });
 
                 // Rhythm jump sequence
                 platforms.push({ x: 1500, y: curY, w: 80, h: 40 });
@@ -597,9 +597,9 @@
                 
                 // Vertical laser grid
                 platforms.push({ x: 850, y: curY - 200, w: 60, h: 40 }); // Tiny platform
-                lasers.push({ x: 800, y: curY - 500, w: 16, h: 500, state: 'off', timer: 0, cycle: 120 });
-                lasers.push({ x: 872, y: curY - 500, w: 16, h: 500, state: 'off', timer: 40, cycle: 120 });
-                lasers.push({ x: 944, y: curY - 500, w: 16, h: 500, state: 'off', timer: 80, cycle: 120 });
+                lasers.push({ x: 800, y: curY - 500, w: 16, h: 500, state: 'off', timer: 0, cycle: 90 });
+                lasers.push({ x: 872, y: curY - 500, w: 16, h: 500, state: 'off', timer: 30, cycle: 90 });
+                lasers.push({ x: 944, y: curY - 500, w: 16, h: 500, state: 'off', timer: 60, cycle: 90 });
 
                 platforms.push({ x: 1100, y: curY, w: 800, h: 40 });
                 crushers.push({ x: 1300, y: curY - 300, w: 80, h: 100, startY: curY - 300, targetY: curY - 80, state: 'waiting', timer: 0 });
@@ -615,7 +615,7 @@
 
                 // Arena
                 pendingArena = {
-                    triggerX: 2900,
+                    triggerX: 3100, // Trigger deeper
                     startX: 2760,
                     endX: 4000,
                     y: curY,
@@ -1101,10 +1101,12 @@
                     }
                 } else {
                     l.timer++;
+                    // 70% ON, 30% OFF duty cycle
+                    const onTime = l.cycle * 0.7;
                     if (l.timer >= l.cycle) {
                         l.timer = 0;
-                        l.state = l.state === 'on' ? 'off' : 'on';
                     }
+                    l.state = l.timer < onTime ? 'on' : 'off';
                 }
             });
 
@@ -1432,7 +1434,7 @@
             cameraY += (height/2 - player.y - cameraY) * 0.1;
         }
 
-        function draw() {
+        function drawBackground() {
             // Background Gradient: Dark Blue to Purple
             const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
             bgGrad.addColorStop(0, '#020205');
@@ -1441,15 +1443,48 @@
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, width, height);
 
-            // Stars
+            // Neon Bricks Pattern
+            ctx.save();
+            // Use a very slow parallax for the bricks
+            const pX = cameraX * 0.15;
+            const pY = cameraY * 0.15;
+            
+            const brickW = 40;
+            const brickH = 20;
+            const gap = 4;
+            const totalW = brickW + gap;
+            const totalH = brickH + gap;
+            
+            ctx.strokeStyle = 'rgba(0, 242, 255, 0.1)';
+            ctx.lineWidth = 1;
+            
+            const startX = Math.floor(-pX / totalW) * totalW - totalW;
+            const endX = startX + width + totalW * 2;
+            const startY = Math.floor(-pY / totalH) * totalH - totalH;
+            const endY = startY + height + totalH * 2;
+
+            for (let y = startY; y < endY; y += totalH) {
+                const row = Math.floor((y + pY) / totalH);
+                const xOffset = (row % 2 === 0) ? 0 : totalW / 2;
+                for (let x = startX; x < endX; x += totalW) {
+                    ctx.strokeRect(x + xOffset + (pX % totalW), y + (pY % totalH), brickW, brickH);
+                }
+            }
+            ctx.restore();
+
+            // Stars (keep some for depth)
             ctx.fillStyle = '#fff';
             stars.forEach(s => {
                 const sx = (s.x + cameraX * s.speed) % 5000;
                 const drawX = sx < 0 ? sx + 5000 : sx;
-                ctx.globalAlpha = 0.3 + Math.sin(frameCount * 0.05 + s.x) * 0.2;
+                ctx.globalAlpha = 0.2 + Math.sin(frameCount * 0.05 + s.x) * 0.1;
                 ctx.fillRect(drawX, s.y, s.size, s.size);
             });
             ctx.globalAlpha = 1.0;
+        }
+
+        function draw() {
+            drawBackground();
             
             ctx.strokeStyle = 'rgba(0, 242, 255, 0.03)';
             ctx.lineWidth = 1;
@@ -1614,6 +1649,22 @@
                     ctx.fillText('NEON SHOP', p.x + p.w/2, p.y - 40);
                     ctx.font = '12px Orbitron';
                     ctx.fillText('STAND HERE TO BROWSE', p.x + p.w/2, p.y - 20);
+                } else if (p.isWall) {
+                    ctx.fillStyle = 'rgba(255, 0, 85, 0.2)';
+                    ctx.strokeStyle = varColor('--neon-pink');
+                    ctx.lineWidth = 4;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    ctx.strokeRect(p.x, p.y, p.w, p.h);
+                    
+                    // Warning stripes
+                    ctx.strokeStyle = 'rgba(255, 0, 85, 0.5)';
+                    ctx.lineWidth = 2;
+                    for (let sy = p.y; sy < p.y + p.h; sy += 20) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, sy);
+                        ctx.lineTo(p.x + p.w, sy + 10);
+                        ctx.stroke();
+                    }
                 } else {
                     ctx.fillStyle = '#000';
                     ctx.strokeStyle = varColor('--neon-cyan');

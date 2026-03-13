@@ -354,7 +354,7 @@
         const JUMP_FORCE = -12.5;
         const MOVE_SPEED = 7;
         const DRONE_SPEED = 2.5;
-        const DRONE_TRACK_SPEED = 0.04;
+        const DRONE_TRACK_SPEED = 0.06;
         const PLAYER_SIZE_W = 30;
         const PLAYER_SIZE_H = 30;
 
@@ -418,41 +418,56 @@
 
         function initBuildings() {
             buildings = [];
-            // Palette: Purple, Dark Blue, Cyan
             const colors = ['#8b5cf6', '#1e1b4b', '#00f2ff'];
             
-            // Central Tower Core (Parallax)
-            for(let i = 0; i < 5; i++) {
+            // Tower Interior Walls (Background)
+            for(let i = 0; i < 10; i++) {
                 buildings.push({
-                    x: 1000 + i * 1500,
+                    x: i * 1000,
                     y: -2000,
-                    w: 800,
+                    w: 1000,
                     h: 10000,
                     parallax: 0.05,
-                    color: '#0a0a1a',
-                    isCore: true,
-                    windows: Array.from({length: 100}, () => ({
+                    color: '#050510',
+                    isWall: true,
+                    bricks: Array.from({length: 300}, () => ({
+                        x: Math.random(),
+                        y: Math.random(),
+                        w: 0.04 + Math.random() * 0.08,
+                        h: 0.004,
+                        color: Math.random() > 0.85 ? colors[Math.floor(Math.random() * colors.length)] : 'rgba(255,255,255,0.03)'
+                    })),
+                    windows: Array.from({length: 40}, () => ({
                         x: 0.1 + Math.random() * 0.8,
                         y: Math.random(),
-                        w: 0.05,
-                        h: 0.002,
-                        on: Math.random() > 0.3
+                        w: 0.08,
+                        h: 0.015,
+                        on: Math.random() > 0.4
+                    })),
+                    pipes: Array.from({length: 5}, () => ({
+                        x: Math.random(),
+                        w: 0.01 + Math.random() * 0.02,
+                        color: Math.random() > 0.5 ? '#1e1b4b' : '#2d2d4d'
                     }))
                 });
             }
 
-            // Structural Beams and Pipes
-            for(let i = 0; i < 40; i++) {
-                const parallax = 0.1 + Math.random() * 0.1;
+            // Structural Girders
+            for(let i = 0; i < 15; i++) {
+                const parallax = 0.08 + Math.random() * 0.04;
                 buildings.push({
                     x: Math.random() * 10000,
                     y: -2000,
-                    w: 10 + Math.random() * 30,
+                    w: 60 + Math.random() * 40,
                     h: 10000,
                     parallax: parallax,
-                    color: '#1a1a2e',
+                    color: '#111122',
                     isBeam: true,
-                    glowColor: colors[Math.floor(Math.random() * colors.length)]
+                    glowColor: colors[Math.floor(Math.random() * colors.length)],
+                    crossbeams: Array.from({length: 50}, () => ({
+                        y: Math.random(),
+                        h: 0.002
+                    }))
                 });
             }
         }
@@ -629,7 +644,7 @@
                     enemies.push({ x: arenaX + 200, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
                     enemies.push({ x: arenaX + 500, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
                     enemies.push({ x: arenaX + 800, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 300, w: 45, h: 45, vx: DRONE_SPEED * 3, platform: { x: arenaX, w: arenaW }, health: 8, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 2.5, isElite: true });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 300, w: 45, h: 45, vx: DRONE_SPEED * 2.5, platform: { x: arenaX, w: arenaW }, health: 8, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 2, isElite: true });
                 }
             }
             showMsg("WAVE " + waveNum);
@@ -1146,14 +1161,20 @@
                     // Vertical tracking
                     if (en.verticalTracking) {
                         const targetY = player.y + (en.hoverOffset || 0);
-                        const dy = targetY - en.y;
-                        en.y += dy * (en.trackSpeed || 0.02);
-                        
-                        // Horizontal tracking
                         const dx = player.x - en.x;
-                        if (Math.abs(dx) < 600) {
-                            en.vx += (dx > 0 ? 0.4 : -0.4);
-                            en.vx *= 0.9; // Tighter control
+                        const dy = targetY - en.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 800) {
+                            // Normalized tracking for balanced speed in all directions
+                            const speed = (en.trackSpeed || 0.05) * 100;
+                            const vx_target = (dx / dist) * speed;
+                            const vy_target = (dy / dist) * speed;
+                            
+                            en.vx += (vx_target - en.vx) * 0.1;
+                            en.y += (vy_target) * 0.5; // Direct vertical movement for responsiveness
+                        } else {
+                            en.vx *= 0.95;
                         }
                     }
                     
@@ -1377,21 +1398,68 @@
                 const drawX = bx < -b.w ? bx + 5000 : bx;
                 const drawY = b.y + cameraY * b.parallax;
                 
-                if (b.isCore) {
+                if (b.isWall) {
                     ctx.fillStyle = b.color;
                     ctx.fillRect(drawX, drawY, b.w, b.h);
                     
-                    ctx.fillStyle = 'rgba(0, 242, 255, 0.1)';
+                    // Panels / Large Bricks
+                    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+                    ctx.lineWidth = 1;
+                    for(let px = 0; px < b.w; px += 200) {
+                        ctx.strokeRect(drawX + px, drawY, 200, b.h);
+                    }
+
+                    // Pipes
+                    b.pipes.forEach(p => {
+                        ctx.fillStyle = p.color;
+                        ctx.fillRect(drawX + p.x * b.w, drawY, p.w * b.w, b.h);
+                        // Pipe highlights
+                        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                        ctx.fillRect(drawX + p.x * b.w, drawY, (p.w * b.w) / 3, b.h);
+                    });
+
+                    // Bricks (Neon highlights)
+                    b.bricks.forEach(br => {
+                        ctx.fillStyle = br.color;
+                        ctx.fillRect(drawX + br.x * b.w, drawY + br.y * b.h, br.w * b.w, br.h * b.h);
+                        if (br.color !== 'rgba(255,255,255,0.03)') {
+                            ctx.shadowBlur = 5;
+                            ctx.shadowColor = br.color;
+                            ctx.fillRect(drawX + br.x * b.w, drawY + br.y * b.h, br.w * b.w, br.h * b.h);
+                            ctx.shadowBlur = 0;
+                        }
+                    });
+
+                    // Windows
                     b.windows.forEach(w => {
                         if (w.on) {
+                            ctx.fillStyle = 'rgba(0, 242, 255, 0.15)';
                             ctx.fillRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
+                            ctx.strokeStyle = 'rgba(0, 242, 255, 0.4)';
+                            ctx.lineWidth = 1;
+                            ctx.strokeRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
+                            
+                            // Window frame/glow
+                            ctx.shadowBlur = 5;
+                            ctx.shadowColor = '#00f2ff';
+                            ctx.strokeRect(drawX + w.x * b.w, drawY + w.y * b.h, w.w * b.w, w.h * b.h);
+                            ctx.shadowBlur = 0;
                         }
                     });
                 } else if (b.isBeam) {
-                    ctx.shadowBlur = 10;
+                    ctx.shadowBlur = 15;
                     ctx.shadowColor = b.glowColor;
+                    ctx.fillStyle = b.color;
+                    ctx.fillRect(drawX, drawY, b.w, b.h);
+                    
+                    // Crossbeams
+                    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                    b.crossbeams.forEach(cb => {
+                        ctx.fillRect(drawX, drawY + cb.y * b.h, b.w, cb.h * b.h);
+                    });
+
                     ctx.strokeStyle = b.glowColor;
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 2;
                     ctx.strokeRect(drawX, drawY, b.w, b.h);
                     ctx.shadowBlur = 0;
                 }

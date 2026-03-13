@@ -355,6 +355,7 @@
         const MOVE_SPEED = 7;
         const DRONE_SPEED = 2.5;
         const DRONE_TRACK_SPEED = 0.06;
+        const KNIGHT_SPEED = MOVE_SPEED * 0.75;
         const PLAYER_SIZE_W = 30;
         const PLAYER_SIZE_H = 30;
 
@@ -371,6 +372,7 @@
             weapon: 'sword', hasBow: false, chargeSpeed: 1, damageResist: 1
         };
         let arrows = [];
+        let enemyProjectiles = [];
         let selectedShopItem = -1;
         let platforms = [];
         let spikes = [];
@@ -480,6 +482,7 @@
             saws = [];
             enemies = [];
             coins = [];
+            enemyProjectiles = [];
             arenaActive = false;
             waveTransition = false;
             arenaCleared = false;
@@ -497,8 +500,8 @@
                 
                 platforms.push({ x: 2500, y: curY - 60, w: 400, h: 40 }); // Added platform for drone
                 enemies.push({ 
-                    x: 2550, y: curY - 150, w: 30, h: 30, vx: DRONE_SPEED, 
-                    platform: { x: 2500, w: 400 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
+                    x: 2550, y: curY - 100, w: 30, h: 30, vx: DRONE_SPEED, 
+                    platform: { x: 2500, w: 400 }, health: 1, type: 'drone' 
                 });
                 platforms.push({ x: 3000, y: curY - 60, w: 200, h: 40, type: 'goal' });
 
@@ -514,12 +517,12 @@
                 platforms.push({ x: 2100, y: curY - 100, w: 300, h: 40 }); // Extra platform to bridge the gap
                 
                 enemies.push({ 
-                    x: 1800, y: curY - 50, w: 30, h: 30, vx: DRONE_SPEED, 
-                    platform: { x: 1700, w: 700 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
+                    x: 1800, y: curY - 40, w: 30, h: 30, vx: DRONE_SPEED, 
+                    platform: { x: 1700, w: 700 }, health: 1, type: 'drone' 
                 });
                 enemies.push({ 
-                    x: 2100, y: curY - 250, w: 30, h: 30, vx: -DRONE_SPEED, 
-                    platform: { x: 1700, w: 700 }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
+                    x: 2100, y: curY - 40, w: 30, h: 30, vx: -DRONE_SPEED, 
+                    platform: { x: 1700, w: 700 }, health: 1, type: 'drone' 
                 });
 
                 // Staircase
@@ -569,12 +572,12 @@
                 platforms.push({ x: 2000, y: curY - 160, w: 150, h: 40 });
 
                 enemies.push({ 
-                    x: 2300, y: curY - 200, w: 30, h: 30, vx: DRONE_SPEED * 1.5, 
-                    platform: { x: 2100, w: 600 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
+                    x: 2300, y: curY - 40, w: 30, h: 30, vx: DRONE_SPEED * 1.2, 
+                    platform: { x: 2100, w: 600 }, health: 2, type: 'drone' 
                 });
                 enemies.push({ 
-                    x: 2500, y: curY - 100, w: 30, h: 30, vx: -DRONE_SPEED, 
-                    platform: { x: 2100, w: 600 }, health: 3, type: 'shield', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED 
+                    x: 2500, y: curY - 40, w: 30, h: 30, vx: -DRONE_SPEED, 
+                    platform: { x: 2100, w: 600 }, health: 3, type: 'shield' 
                 });
 
                 platforms.push({ x: 2800, y: curY, w: 600, h: 40 });
@@ -600,9 +603,9 @@
                 // Long gap requiring dash
                 platforms.push({ x: 2800, y: curY, w: 1200, h: 150 });
                 
-                enemies.push({ x: 2900, y: curY - 100, w: 30, h: 30, vx: DRONE_SPEED * 2, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
-                enemies.push({ x: 3500, y: curY - 100, w: 30, h: 30, vx: -DRONE_SPEED * 2, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
-                enemies.push({ x: 3200, y: curY - 50, w: 30, h: 30, vx: 0, platform: { x: 2800, w: 1200 }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                enemies.push({ x: 2900, y: curY - 40, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone' });
+                enemies.push({ x: 3500, y: curY - 40, w: 30, h: 30, vx: -DRONE_SPEED * 1.5, platform: { x: 2800, w: 1200 }, health: 2, type: 'drone' });
+                enemies.push({ x: 3200, y: curY - 40, w: 30, h: 30, vx: 0, platform: { x: 2800, w: 1200 }, health: 4, type: 'shield' });
 
                 // Arena
                 platforms.push({ x: 2760, y: curY - 800, w: 40, h: 800, isWall: true });
@@ -622,6 +625,7 @@
 
         function spawnWave(waveNum) {
             enemies = [];
+            enemyProjectiles = [];
             waveTransition = false;
             const arenaY = height - 150;
             const arenaX = floor === 3 ? 2700 : 2800;
@@ -629,22 +633,24 @@
 
             if (floor === 3) {
                 if (waveNum === 1) {
-                    enemies.push({ x: arenaX + 200, y: arenaY - 50, w: 30, h: 30, vx: DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 30, h: 30, vx: -DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
-                    enemies.push({ x: arenaX + 1000, y: arenaY - 400, w: 30, h: 30, vx: DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 200, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 1000, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                 } else {
-                    enemies.push({ x: arenaX + 600, y: arenaY - 200, w: 40, h: 40, vx: DRONE_SPEED * 2, platform: { x: arenaX, w: arenaW }, health: 5, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 2, isElite: true });
+                    enemies.push({ x: arenaX + 400, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 800, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 100, w: 40, h: 40, vx: DRONE_SPEED, platform: { x: arenaX, w: arenaW }, health: 1, type: 'drone' });
                 }
             } else if (floor === 5) {
                 if (waveNum === 1) {
-                    enemies.push({ x: arenaX + 300, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 2, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
-                    enemies.push({ x: arenaX + 900, y: arenaY - 100, w: 30, h: 30, vx: -DRONE_SPEED * 2, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 1.5 });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 50, w: 30, h: 30, vx: 0, platform: { x: arenaX, w: arenaW }, health: 4, type: 'shield', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
+                    enemies.push({ x: arenaX + 300, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 900, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                 } else {
-                    enemies.push({ x: arenaX + 200, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
-                    enemies.push({ x: arenaX + 500, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
-                    enemies.push({ x: arenaX + 800, y: arenaY - 100, w: 30, h: 30, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 2, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 300, w: 45, h: 45, vx: DRONE_SPEED * 2.5, platform: { x: arenaX, w: arenaW }, health: 8, type: 'drone', verticalTracking: true, trackSpeed: DRONE_TRACK_SPEED * 2, isElite: true });
+                    enemies.push({ x: arenaX + 200, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 500, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 800, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 600, y: arenaY - 150, w: 45, h: 45, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 3, type: 'drone', isElite: true });
                 }
             }
             showMsg("WAVE " + waveNum);
@@ -658,6 +664,7 @@
             player.vy = 0;
             player.jumps = 0;
             player.facing = 1;
+            enemyProjectiles = [];
             player.isAttacking = false;
             player.attackTimer = 0;
             player.isCharging = false;
@@ -1158,35 +1165,39 @@
                 
                 // AI Logic
                 if (en.type === 'drone' || en.type === 'shield') {
-                    // Vertical tracking
-                    if (en.verticalTracking) {
-                        const targetY = player.y + (en.hoverOffset || 0);
-                        const dx = player.x - en.x;
-                        const dy = targetY - en.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if (dist < 800) {
-                            // Normalized tracking for balanced speed in all directions
-                            const speed = (en.trackSpeed || 0.05) * 100;
-                            const vx_target = (dx / dist) * speed;
-                            const vy_target = (dy / dist) * speed;
-                            
-                            en.vx += (vx_target - en.vx) * 0.1;
-                            en.y += (vy_target) * 0.5; // Direct vertical movement for responsiveness
-                        } else {
-                            en.vx *= 0.95;
-                        }
-                    }
-                    
+                    // Simplified Drone AI: Simple patrol on platform
                     en.x += en.vx;
-                    if (!en.verticalTracking) {
-                        if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
-                            en.vx *= -1;
-                        }
-                    } else {
-                        // Loose leash
-                        if (en.x < en.platform.x - 300) { en.x = en.platform.x - 300; en.vx *= -0.5; }
-                        if (en.x + en.w > en.platform.x + en.platform.w + 300) { en.x = en.platform.x + en.platform.w + 300 - en.w; en.vx *= -0.5; }
+                    if (en.x < en.platform.x || en.x + en.w > en.platform.x + en.platform.w) {
+                        en.vx *= -1;
+                        en.x = Math.max(en.platform.x, Math.min(en.x, en.platform.x + en.platform.w - en.w));
+                    }
+                } else if (en.type === 'knight') {
+                    // Neo Knight AI
+                    const distToPlayer = player.x - en.x;
+                    const dir = distToPlayer > 0 ? 1 : -1;
+                    en.facing = dir;
+                    
+                    // Movement: 75% of player speed
+                    en.vx = dir * KNIGHT_SPEED;
+                    en.x += en.vx;
+                    
+                    // Stay on platform
+                    if (en.x < en.platform.x) { en.x = en.platform.x; en.vx = 0; }
+                    if (en.x + en.w > en.platform.x + en.platform.w) { en.x = en.platform.x + en.platform.w - en.w; en.vx = 0; }
+                    
+                    // Attack: Throw laser sword once every 3 seconds (180 frames)
+                    en.attackTimer = (en.attackTimer || 0) + 1;
+                    if (en.attackTimer >= 180) {
+                        en.attackTimer = 0;
+                        enemyProjectiles.push({
+                            x: en.x + en.w/2,
+                            y: en.y + en.h/2,
+                            vx: dir * 10,
+                            vy: 0,
+                            w: 40,
+                            h: 10,
+                            type: 'sword'
+                        });
                     }
                 } else if (en.type === 'runner') {
                     const distToPlayer = Math.abs(player.x - en.x);
@@ -1259,11 +1270,12 @@
                         }
 
                         const isDashHit = player.isDashing;
-                        const damage = isDashHit ? 2 : 1;
+                        // Neo Knights take 2 hits or 1 dash
+                        const damage = (en.type === 'knight' && isDashHit) ? 2 : (isDashHit ? 2 : 1);
                         
                         en.health -= damage;
                         if (en.health <= 0) {
-                            createParticles(en.x + en.w/2, en.y + en.h/2, varColor('--neon-cyan'), 15);
+                            createParticles(en.x + en.w/2, en.y + en.h/2, en.type === 'knight' ? '#ff0000' : varColor('--neon-cyan'), 15);
                             coins.push({ x: en.x + en.w/2, y: en.y + en.h/2 });
                             enemies.splice(i, 1);
                         } else {
@@ -1284,10 +1296,41 @@
                     if (!player.isDashing) {
                         if (en.type === 'drone' || en.type === 'shield') {
                             takeDamage(10, en.x);
+                        } else if (en.type === 'knight') {
+                            takeDamage(25, en.x);
                         } else if (en.type === 'runner' && en.state === 'dashing') {
                             takeDamage(10, en.x);
                         }
                     }
+                }
+            }
+
+            // Update Enemy Projectiles
+            for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+                const p = enemyProjectiles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                
+                // Collision with player
+                if (player.x + player.w > p.x && player.x < p.x + p.w &&
+                    player.y + player.h > p.y && player.y < p.y + p.h) {
+                    if (!player.isDashing) {
+                        takeDamage(25, p.x);
+                        enemyProjectiles.splice(i, 1);
+                        continue;
+                    }
+                }
+                
+                // Collision with platforms
+                let hitPlatform = false;
+                platforms.forEach(plat => {
+                    if (p.x > plat.x && p.x < plat.x + plat.w && p.y > plat.y && p.y < plat.y + plat.h) {
+                        hitPlatform = true;
+                    }
+                });
+                
+                if (hitPlatform || Math.abs(p.x - player.x) > 2000) {
+                    enemyProjectiles.splice(i, 1);
                 }
             }
 
@@ -1667,6 +1710,45 @@
                     ctx.shadowColor = en.isElite ? varColor('--neon-cyan') : varColor('--neon-pink');
                     ctx.strokeRect(en.x, en.y, en.w, en.h);
                     ctx.shadowBlur = 0;
+                } else if (en.type === 'knight') {
+                    // Neo Knight: Red Hexagon
+                    ctx.save();
+                    ctx.translate(en.x + en.w/2, en.y + en.h/2);
+                    
+                    ctx.fillStyle = '#111';
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#ff0000';
+                    
+                    ctx.beginPath();
+                    for(let i = 0; i < 6; i++) {
+                        const angle = (i * Math.PI) / 3;
+                        const x = (en.w/2) * Math.cos(angle);
+                        const y = (en.h/2) * Math.sin(angle);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    
+                    // Sword
+                    ctx.save();
+                    ctx.translate(en.facing * 15, 0);
+                    ctx.rotate(en.facing === 1 ? Math.PI/4 : -Math.PI/4 + Math.PI);
+                    
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-10, 0); ctx.stroke();
+                    
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.shadowBlur = 15;
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25, 0); ctx.stroke();
+                    ctx.restore();
+                    
+                    ctx.restore();
                 } else if (en.type === 'runner') {
                     ctx.fillStyle = '#000';
                     ctx.strokeStyle = varColor('--neon-pink');
@@ -1710,6 +1792,33 @@
                 ctx.moveTo(a.x + cameraX, a.y + cameraY);
                 ctx.lineTo(a.x + cameraX - a.vx * 1.5, a.y + cameraY - a.vy * 1.5);
                 ctx.stroke();
+            });
+
+            // Enemy Projectiles (Laser Swords)
+            enemyProjectiles.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x + cameraX, p.y + cameraY);
+                ctx.rotate(frameCount * 0.5); // Spin the sword
+                
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff0000';
+                
+                ctx.beginPath();
+                ctx.moveTo(-p.w/2, 0);
+                ctx.lineTo(p.w/2, 0);
+                ctx.stroke();
+                
+                // Hilt
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(-p.w/2, 0);
+                ctx.lineTo(-p.w/2 + 10, 0);
+                ctx.stroke();
+                
+                ctx.restore();
             });
 
             // Player (Cube)

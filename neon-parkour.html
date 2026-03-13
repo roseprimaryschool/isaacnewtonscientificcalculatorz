@@ -642,9 +642,8 @@
 
             if (floor === 3) {
                 if (waveNum === 1) {
-                    enemies.push({ x: arenaX + 200, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
-                    enemies.push({ x: arenaX + 1000, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 300, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 900, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                 } else {
                     enemies.push({ x: arenaX + 400, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                     enemies.push({ x: arenaX + 800, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
@@ -654,11 +653,9 @@
                 if (waveNum === 1) {
                     enemies.push({ x: arenaX + 300, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                     enemies.push({ x: arenaX + 900, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
-                    enemies.push({ x: arenaX + 600, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                 } else {
-                    enemies.push({ x: arenaX + 200, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
-                    enemies.push({ x: arenaX + 500, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
-                    enemies.push({ x: arenaX + 800, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 300, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
+                    enemies.push({ x: arenaX + 900, y: arenaY - 40, w: 40, h: 40, vx: 0, platform: { x: arenaX, w: arenaW }, health: 2, type: 'knight' });
                     enemies.push({ x: arenaX + 600, y: arenaY - 150, w: 45, h: 45, vx: DRONE_SPEED * 1.5, platform: { x: arenaX, w: arenaW }, health: 3, type: 'drone', isElite: true });
                 }
             }
@@ -1206,9 +1203,25 @@
                     }
                 } else if (en.type === 'knight') {
                     // Neo Knight AI
-                    const distToPlayer = player.x - en.x;
-                    const dir = distToPlayer > 0 ? 1 : -1;
-                    en.facing = dir;
+                    if (en.hasSword === undefined) en.hasSword = true;
+                    
+                    const distToPlayerX = player.x - en.x;
+                    const absDistX = Math.abs(distToPlayerX);
+                    
+                    // Desired distance: 400 pixels
+                    const desiredDist = 400;
+                    
+                    let dir = 0;
+                    if (absDistX < desiredDist - 20) {
+                        // Too close, run away
+                        dir = distToPlayerX > 0 ? -1 : 1;
+                    } else if (absDistX > desiredDist + 20) {
+                        // Too far, move closer
+                        dir = distToPlayerX > 0 ? 1 : -1;
+                    }
+                    
+                    // Always face the player
+                    en.facing = distToPlayerX > 0 ? 1 : -1;
                     
                     // Movement: 75% of player speed
                     en.vx = dir * KNIGHT_SPEED;
@@ -1218,19 +1231,24 @@
                     if (en.x < en.platform.x) { en.x = en.platform.x; en.vx = 0; }
                     if (en.x + en.w > en.platform.x + en.platform.w) { en.x = en.platform.x + en.platform.w - en.w; en.vx = 0; }
                     
-                    // Attack: Throw laser sword once every 3 seconds (180 frames)
-                    en.attackTimer = (en.attackTimer || 0) + 1;
-                    if (en.attackTimer >= 180) {
-                        en.attackTimer = 0;
-                        enemyProjectiles.push({
-                            x: en.x + en.w/2,
-                            y: en.y + en.h/2,
-                            vx: dir * 10,
-                            vy: 0,
-                            w: 40,
-                            h: 10,
-                            type: 'sword'
-                        });
+                    // Attack: Throw laser sword if they have it
+                    if (en.hasSword) {
+                        en.attackTimer = (en.attackTimer || 0) + 1;
+                        if (en.attackTimer >= 60) { // Throw after 1 second of holding it
+                            en.hasSword = false;
+                            en.attackTimer = 0;
+                            enemyProjectiles.push({
+                                x: en.x + en.w/2,
+                                y: en.y + en.h/2,
+                                vx: en.facing * 12,
+                                vy: 0,
+                                w: 60,
+                                h: 15,
+                                type: 'sword',
+                                owner: en,
+                                timer: 0
+                            });
+                        }
                     }
                 } else if (en.type === 'runner') {
                     const distToPlayer = Math.abs(player.x - en.x);
@@ -1344,26 +1362,66 @@
                 p.x += p.vx;
                 p.y += p.vy;
                 
+                if (p.type === 'sword') {
+                    p.timer++;
+                    if (p.timer > 90) { // 1.5 seconds out
+                        // Return to owner
+                        if (p.owner && p.owner.health > 0) {
+                            const dx = (p.owner.x + p.owner.w/2) - p.x;
+                            const dy = (p.owner.y + p.owner.h/2) - p.y;
+                            const dist = Math.hypot(dx, dy);
+                            if (dist < 30) {
+                                p.owner.hasSword = true;
+                                p.owner.attackTimer = 0;
+                                enemyProjectiles.splice(i, 1);
+                                continue;
+                            } else {
+                                p.vx = (dx / dist) * 15;
+                                p.vy = (dy / dist) * 15;
+                            }
+                        } else {
+                            // Owner is dead, just disappear
+                            enemyProjectiles.splice(i, 1);
+                            continue;
+                        }
+                    }
+                }
+                
                 // Collision with player
                 if (player.x + player.w > p.x && player.x < p.x + p.w &&
                     player.y + player.h > p.y && player.y < p.y + p.h) {
                     if (!player.isDashing) {
                         takeDamage(25, p.x);
-                        enemyProjectiles.splice(i, 1);
-                        continue;
+                        if (p.type === 'sword' && p.timer <= 90) {
+                            p.timer = 91; // Force return
+                        } else if (p.type !== 'sword') {
+                            enemyProjectiles.splice(i, 1);
+                            continue;
+                        }
                     }
                 }
                 
                 // Collision with platforms
                 let hitPlatform = false;
-                platforms.forEach(plat => {
-                    if (p.x > plat.x && p.x < plat.x + plat.w && p.y > plat.y && p.y < plat.y + plat.h) {
-                        hitPlatform = true;
-                    }
-                });
+                if (p.type !== 'sword') { // Swords pass through platforms
+                    platforms.forEach(plat => {
+                        if (p.x > plat.x && p.x < plat.x + plat.w && p.y > plat.y && p.y < plat.y + plat.h) {
+                            hitPlatform = true;
+                        }
+                    });
+                }
                 
                 if (hitPlatform || Math.abs(p.x - player.x) > 2000) {
-                    enemyProjectiles.splice(i, 1);
+                    if (p.type === 'sword') {
+                        if (Math.abs(p.x - player.x) > 2000) {
+                            if (p.owner) p.owner.hasSword = true;
+                            enemyProjectiles.splice(i, 1);
+                            continue;
+                        }
+                        if (p.timer <= 90) p.timer = 91; // Force return on platform hit
+                    } else {
+                        enemyProjectiles.splice(i, 1);
+                    }
                 }
             }
 
@@ -1882,22 +1940,31 @@
                 ctx.translate(p.x + cameraX, p.y + cameraY);
                 ctx.rotate(frameCount * 0.5); // Spin the sword
                 
+                // Outer Glow
                 ctx.strokeStyle = '#ff0000';
-                ctx.lineWidth = 3;
-                ctx.shadowBlur = 15;
+                ctx.lineWidth = 6;
+                ctx.shadowBlur = 25;
                 ctx.shadowColor = '#ff0000';
-                
                 ctx.beginPath();
                 ctx.moveTo(-p.w/2, 0);
                 ctx.lineTo(p.w/2, 0);
                 ctx.stroke();
+
+                // Inner Core
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.moveTo(-p.w/2 + 5, 0);
+                ctx.lineTo(p.w/2 - 5, 0);
+                ctx.stroke();
                 
                 // Hilt
                 ctx.strokeStyle = '#333';
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 5;
                 ctx.beginPath();
                 ctx.moveTo(-p.w/2, 0);
-                ctx.lineTo(-p.w/2 + 10, 0);
+                ctx.lineTo(-p.w/2 + 12, 0);
                 ctx.stroke();
                 
                 ctx.restore();

@@ -393,6 +393,7 @@
         let totalWaves = 3;
         let arenaActive = false;
         let arenaCleared = false;
+        let pendingArena = null;
         let waveTransition = false;
         let showShop = false;
         let coinsAtArenaStart = 0;
@@ -484,6 +485,7 @@
             coins = [];
             enemyProjectiles = [];
             arenaActive = false;
+            pendingArena = null;
             waveTransition = false;
             arenaCleared = false;
             
@@ -547,14 +549,18 @@
 
                 // Arena
                 platforms.push({ x: 2700, y: curY, w: 1200, h: 150 });
-                platforms.push({ x: 2660, y: curY - 800, w: 40, h: 800, isWall: true });
-                platforms.push({ x: 3900, y: curY - 800, w: 40, h: 800, isWall: true });
                 
-                arenaActive = true;
-                currentWave = 1;
+                pendingArena = {
+                    triggerX: 2800,
+                    startX: 2700,
+                    endX: 3900,
+                    y: curY,
+                    waves: 2
+                };
+                
+                currentWave = 0;
                 totalWaves = 2;
                 coinsAtArenaStart = coins_collected;
-                spawnWave(currentWave);
 
             } else if (num === 4) {
                 // Floor 4: Reactor Access
@@ -608,14 +614,17 @@
                 enemies.push({ x: 3200, y: curY - 40, w: 30, h: 30, vx: 0, platform: { x: 2800, w: 1200 }, health: 4, type: 'shield' });
 
                 // Arena
-                platforms.push({ x: 2760, y: curY - 800, w: 40, h: 800, isWall: true });
-                platforms.push({ x: 4000, y: curY - 800, w: 40, h: 800, isWall: true });
+                pendingArena = {
+                    triggerX: 2900,
+                    startX: 2760,
+                    endX: 4000,
+                    y: curY,
+                    waves: 2
+                };
                 
-                arenaActive = true;
-                currentWave = 1;
+                currentWave = 0;
                 totalWaves = 2;
                 coinsAtArenaStart = coins_collected;
-                spawnWave(currentWave);
             } else {
                 // Procedural fallback
                 platforms.push({ x: -200, y: curY, w: 600, h: 150 });
@@ -681,10 +690,20 @@
             isElevatorRising = false;
             
             if (arenaActive) {
+                arenaActive = false;
+                platforms = platforms.filter(p => !p.isWall);
+                enemies = [];
+                // Restore pendingArena based on floor
+                const curY = height - 150;
+                if (floor === 3) {
+                    pendingArena = { triggerX: 2800, startX: 2700, endX: 3900, y: curY, waves: 2 };
+                } else if (floor === 5) {
+                    pendingArena = { triggerX: 2900, startX: 2760, endX: 4000, y: curY, waves: 2 };
+                }
+                
                 coins_collected = coinsAtArenaStart;
                 const coinVal = document.getElementById('coin-val');
                 if (coinVal) coinVal.innerText = coins_collected.toString().padStart(4, '0');
-                spawnWave(currentWave);
             }
         }
 
@@ -946,6 +965,18 @@
             }
 
             // Arena Logic
+            if (pendingArena && player.x > pendingArena.triggerX) {
+                arenaActive = true;
+                // Close walls
+                platforms.push({ x: pendingArena.startX, y: pendingArena.y - 800, w: 40, h: 800, isWall: true });
+                platforms.push({ x: pendingArena.endX, y: pendingArena.y - 800, w: 40, h: 800, isWall: true });
+                
+                currentWave = 1;
+                spawnWave(currentWave);
+                showMsg("ARENA INITIATED");
+                pendingArena = null;
+            }
+
             if (arenaActive) {
                 if (enemies.length === 0 && !waveTransition) {
                     if (currentWave < totalWaves) {

@@ -169,6 +169,101 @@
             box-shadow: 2px 2px 0px #000;
         }
 
+        /* Main Menu Styles */
+        #main-menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background-image: 
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+
+        #menu-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 80px;
+            font-weight: 900;
+            color: #fff;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+            text-shadow: 
+                0 0 10px var(--neon-cyan),
+                0 0 20px var(--neon-cyan),
+                0 0 40px var(--neon-cyan);
+            text-align: center;
+            letter-spacing: 10px;
+            animation: titleGlow 2s infinite alternate;
+        }
+
+        @keyframes titleGlow {
+            from { text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan); }
+            to { text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan), 0 0 60px var(--neon-pink); }
+        }
+
+        #play-btn {
+            background: var(--neon-cyan);
+            color: #000;
+            border: none;
+            padding: 20px 60px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            font-weight: 900;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 8px 8px 0px #fff;
+            transition: all 0.1s;
+            margin-bottom: 40px;
+        }
+
+        #play-btn:hover {
+            transform: translate(-4px, -4px);
+            box-shadow: 12px 12px 0px #fff;
+        }
+
+        #play-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 4px 4px 0px #fff;
+        }
+
+        .volume-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            color: var(--neon-cyan);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #volume-slider {
+            -webkit-appearance: none;
+            width: 200px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--neon-cyan);
+            outline: none;
+        }
+
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--neon-cyan);
+            cursor: pointer;
+            border: 2px solid #fff;
+        }
+
         /* Mobile Controls - Sharp Brutalist Style */
         #mobile-controls {
             position: absolute;
@@ -254,6 +349,16 @@
         </div>
     </div>
 
+    <div id="main-menu">
+        <div id="menu-title">NEON<br>PARKOUR</div>
+        <button id="play-btn">START MISSION</button>
+        <div class="volume-container">
+            <label for="volume-slider">AUDIO VOLUME</label>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+            <div id="audio-status" style="font-size: 10px; margin-top: 10px; opacity: 0.6;">CLICK ANYWHERE TO ENABLE AUDIO</div>
+        </div>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -271,6 +376,11 @@
         const slotSword = document.getElementById('slot-sword');
         const slotBow = document.getElementById('slot-bow');
         const btnSwitch = document.getElementById('btn-switch');
+        const mainMenu = document.getElementById('main-menu');
+        const playBtn = document.getElementById('play-btn');
+        const volumeSlider = document.getElementById('volume-slider');
+
+        let gameState = 'menu';
 
         class DynamicMusicSystem {
             constructor() {
@@ -287,6 +397,24 @@
                 this.masterGain.gain.value = 0.15; // Keep it low so it's background
                 this.masterGain.connect(this.ctx.destination);
                 
+                // Menu Music
+                this.menuMusic = new Audio();
+                this.menuMusic.crossOrigin = "anonymous";
+                // Use the most reliable direct link format for Google Drive
+                this.menuMusic.src = 'https://docs.google.com/uc?export=download&id=1diTMWX7yVcugLWbOTz4kOL0v56A5Tg33';
+                this.menuMusic.loop = true;
+                
+                // We'll connect it to the AudioContext only after it starts playing to avoid some browser quirks
+                this.menuMusicGain = this.ctx.createGain();
+                this.menuMusicGain.gain.value = 1.0;
+                this.menuMusicGain.connect(this.masterGain);
+                
+                this.menuMusicSource = null;
+
+                this.menuMusic.addEventListener('error', (e) => {
+                    console.error("Menu music failed to load:", e);
+                });
+
                 // Bassline sequence (C minor)
                 this.bassSequence = [36, 36, 36, 36, 39, 39, 39, 39, 43, 43, 43, 43, 41, 41, 41, 41]; 
                 // Arp sequence
@@ -294,15 +422,51 @@
             }
             
             start() {
-                if(this.ctx.state === 'suspended') this.ctx.resume();
-                if(this.isPlaying) return;
-                this.isPlaying = true;
-                this.nextNoteTime = this.ctx.currentTime + 0.05;
-                this.scheduler();
+                if(this.ctx.state === 'suspended') {
+                    this.ctx.resume().then(() => {
+                        this.startLogic();
+                    });
+                } else {
+                    this.startLogic();
+                }
+            }
+
+            startLogic() {
+                if (gameState === 'menu') {
+                    if (!this.menuMusicSource) {
+                        try {
+                            this.menuMusicSource = this.ctx.createMediaElementSource(this.menuMusic);
+                            this.menuMusicSource.connect(this.menuMusicGain);
+                        } catch (e) {
+                            console.warn("MediaElementSource connection failed, playing directly:", e);
+                        }
+                    }
+                    this.menuMusic.play().catch(e => {
+                        console.log("Menu music play failed (interaction required?):", e);
+                    });
+                } else {
+                    if(this.isPlaying) return;
+                    this.isPlaying = true;
+                    this.nextNoteTime = this.ctx.currentTime + 0.05;
+                    this.scheduler();
+                }
             }
             
             stop() {
                 this.isPlaying = false;
+                this.menuMusic.pause();
+            }
+
+            setVolume(val) {
+                this.masterGain.gain.setTargetAtTime(val * 0.3, this.ctx.currentTime, 0.1);
+                if (this.menuMusic) {
+                    this.menuMusic.volume = val;
+                }
+            }
+
+            switchToGame() {
+                this.menuMusic.pause();
+                this.start();
             }
             
             setCombatState(isCombat) {
@@ -430,6 +594,8 @@
             if (!musicSystem) {
                 musicSystem = new DynamicMusicSystem();
                 musicSystem.start();
+                const status = document.getElementById('audio-status');
+                if (status) status.style.display = 'none';
             }
         }
 
@@ -498,6 +664,28 @@
         if (shopBtn) {
             shopBtn.addEventListener('click', toggleShop);
         }
+
+        if (playBtn) {
+            playBtn.addEventListener('click', () => {
+                initMusic();
+                gameState = 'playing';
+                mainMenu.style.display = 'none';
+                musicSystem.switchToGame();
+            });
+        }
+
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', (e) => {
+                initMusic();
+                if (musicSystem) {
+                    musicSystem.setVolume(parseFloat(e.target.value));
+                }
+            });
+        }
+
+        window.addEventListener('click', () => {
+            initMusic();
+        }, { once: true });
 
         if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
             document.body.classList.add('is-touch');
@@ -2207,8 +2395,23 @@
         }
 
         function loop() {
-            update();
-            draw();
+            if (gameState === 'playing') {
+                update();
+                draw();
+            } else {
+                // Background draw for menu
+                drawBackground();
+                
+                // Static character or some menu visuals could go here
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                // Scanlines
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                for(let i = 0; i < height; i += 4) {
+                    ctx.fillRect(0, i, width, 2);
+                }
+                ctx.restore();
+            }
             requestAnimationFrame(loop);
         }
 

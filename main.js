@@ -36,6 +36,7 @@ const OperationType = {
 function handleFirestoreError(error, operationType, path) {
     const errInfo = {
         error: error instanceof Error ? error.message : String(error),
+        code: error.code || 'unknown',
         authInfo: {
             userId: auth.currentUser?.uid,
             email: auth.currentUser?.email,
@@ -57,7 +58,14 @@ function handleFirestoreError(error, operationType, path) {
     // Show user-friendly error
     const errorEl = document.getElementById('auth-error'); // Reuse auth error or show a toast
     if (errorEl) {
-        errorEl.innerText = "A database error occurred. Please try again.";
+        let userMsg = "A database error occurred. Please try again.";
+        if (errInfo.code === 'permission-denied') {
+            userMsg = "Permission denied. Please check your account.";
+        } else if (errInfo.error.toLowerCase().includes('index')) {
+            userMsg = "Database index required. Please contact support.";
+            console.warn("INDEX REQUIRED: Click the link in the console error above to create the required index.");
+        }
+        errorEl.innerText = userMsg;
         errorEl.classList.remove('hidden');
         setTimeout(() => errorEl.classList.add('hidden'), 5000);
     }

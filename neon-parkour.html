@@ -392,22 +392,27 @@
                 this.hasAttemptedDriveFallback = false;
 
                 this.menuMusic.addEventListener('error', (e) => {
+                    const status = document.getElementById('audio-status');
                     if (this.currentSourceIndex < this.localSources.length - 1) {
                         this.currentSourceIndex++;
                         console.log(`Trying next local source: ${this.localSources[this.currentSourceIndex]}`);
+                        if (status) status.innerText = `LOADING MUSIC: ${this.localSources[this.currentSourceIndex]}...`;
                         this.menuMusic.src = this.localSources[this.currentSourceIndex];
                         if (gameState === 'menu') this.menuMusic.play().catch(() => {});
                     } else if (!this.hasAttemptedDriveFallback) {
                         console.log("Local music files not found. Trying Google Drive fallback...");
+                        if (status) status.innerText = "LOCAL MUSIC MISSING. TRYING CLOUD FALLBACK...";
                         this.hasAttemptedDriveFallback = true;
                         this.menuMusic.src = 'https://drive.google.com/uc?export=download&id=1diTMWX7yVcugLWbOTz4kOL0v56A5Tg33';
                         if (gameState === 'menu') {
                             this.menuMusic.play().catch(() => {
                                 console.error("All music sources failed.");
+                                if (status) status.innerText = "MUSIC FAILED. PLEASE UPLOAD menu-music.mp3";
                             });
                         }
                     } else {
                         console.error("All external music sources failed.");
+                        if (status) status.innerText = "MUSIC FAILED. PLEASE UPLOAD menu-music.mp3";
                     }
                 });
             }

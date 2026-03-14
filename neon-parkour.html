@@ -397,18 +397,14 @@
                 this.masterGain.gain.value = 0.15; // Keep it low so it's background
                 this.masterGain.connect(this.ctx.destination);
                 
-                // Menu Music
+                // Menu Music - Standalone Audio object to bypass CORS restrictions
                 this.menuMusic = new Audio();
-                this.menuMusic.crossOrigin = "anonymous";
-                // Use the most reliable direct link format for Google Drive
+                // DO NOT set crossOrigin = "anonymous" as Google Drive doesn't support it reliably
                 this.menuMusic.src = 'https://docs.google.com/uc?export=download&id=1diTMWX7yVcugLWbOTz4kOL0v56A5Tg33';
                 this.menuMusic.loop = true;
                 
-                // We'll connect it to the AudioContext only after it starts playing to avoid some browser quirks
-                this.menuMusicGain = this.ctx.createGain();
-                this.menuMusicGain.gain.value = 1.0;
-                this.menuMusicGain.connect(this.masterGain);
-                
+                // We won't use createMediaElementSource for this track to avoid CORS "tainting"
+                this.menuMusicGain = null; 
                 this.menuMusicSource = null;
 
                 this.menuMusic.addEventListener('error', (e) => {
@@ -433,14 +429,6 @@
 
             startLogic() {
                 if (gameState === 'menu') {
-                    if (!this.menuMusicSource) {
-                        try {
-                            this.menuMusicSource = this.ctx.createMediaElementSource(this.menuMusic);
-                            this.menuMusicSource.connect(this.menuMusicGain);
-                        } catch (e) {
-                            console.warn("MediaElementSource connection failed, playing directly:", e);
-                        }
-                    }
                     this.menuMusic.play().catch(e => {
                         console.log("Menu music play failed (interaction required?):", e);
                     });
@@ -454,11 +442,13 @@
             
             stop() {
                 this.isPlaying = false;
-                this.menuMusic.pause();
+                if (this.menuMusic) this.menuMusic.pause();
             }
 
             setVolume(val) {
+                // Procedural music volume
                 this.masterGain.gain.setTargetAtTime(val * 0.3, this.ctx.currentTime, 0.1);
+                // Menu music volume (direct control)
                 if (this.menuMusic) {
                     this.menuMusic.volume = val;
                 }

@@ -355,7 +355,9 @@
         <div class="volume-container">
             <label for="volume-slider">AUDIO VOLUME</label>
             <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
-            <div id="audio-status" style="font-size: 10px; margin-top: 10px; opacity: 0.6;">CLICK ANYWHERE TO ENABLE AUDIO</div>
+            <div id="audio-status" style="font-size: 10px; margin-top: 10px; opacity: 0.6; cursor: pointer; text-decoration: underline;">CLICK TO ENABLE AUDIO</div>
+            <div id="synth-toggle" style="font-size: 10px; margin-top: 5px; cursor: pointer; color: var(--neon-cyan); opacity: 0.8;">USE SYNTH MUSIC ONLY</div>
+            <div id="audio-error" style="font-size: 10px; color: var(--neon-pink); display: none; margin-top: 5px;">EXTERNAL MUSIC FAILED. USING SYNTH THEME.</div>
         </div>
     </div>
 
@@ -397,18 +399,40 @@
                 this.masterGain.gain.value = 0.15; // Keep it low so it's background
                 this.masterGain.connect(this.ctx.destination);
                 
-                // Menu Music - Standalone Audio object to bypass CORS restrictions
+                // Menu Music - Standalone Audio object
                 this.menuMusic = new Audio();
-                // DO NOT set crossOrigin = "anonymous" as Google Drive doesn't support it reliably
-                this.menuMusic.src = 'https://docs.google.com/uc?export=download&id=1diTMWX7yVcugLWbOTz4kOL0v56A5Tg33';
+                
+                // 1. TRY LOCAL FILE FIRST (Best for GitHub Pages)
+                // Upload your file to GitHub and name it 'menu-music.mp3'
+                this.menuMusic.src = './menu-music.mp3'; 
                 this.menuMusic.loop = true;
                 
-                // We won't use createMediaElementSource for this track to avoid CORS "tainting"
                 this.menuMusicGain = null; 
                 this.menuMusicSource = null;
+                this.hasAttemptedDriveFallback = false;
 
                 this.menuMusic.addEventListener('error', (e) => {
-                    console.error("Menu music failed to load:", e);
+                    // If local file fails and we haven't tried Drive yet, try Drive
+                    if (!this.hasAttemptedDriveFallback) {
+                        console.log("Local music (./menu-music.mp3) not found. Trying Google Drive fallback...");
+                        this.hasAttemptedDriveFallback = true;
+                        this.menuMusic.src = 'https://drive.google.com/uc?export=download&id=1diTMWX7yVcugLWbOTz4kOL0v56A5Tg33';
+                        
+                        // Only try to play if we are still in the menu
+                        if (gameState === 'menu') {
+                            this.menuMusic.play().then(() => {
+                                console.log("Drive fallback successful.");
+                                if (this.fallbackTimeout) clearTimeout(this.fallbackTimeout);
+                                const status = document.getElementById('audio-status');
+                                if (status) status.style.display = 'none';
+                            }).catch(() => {
+                                // If Drive also fails, startSynthFallback will be handled by the timeout or the next error
+                            });
+                        }
+                    } else {
+                        console.error("All external music sources failed. Falling back to synth.");
+                        this.startSynthFallback();
+                    }
                 });
 
                 // Bassline sequence (C minor)
@@ -429,14 +453,47 @@
 
             startLogic() {
                 if (gameState === 'menu') {
-                    this.menuMusic.play().catch(e => {
-                        console.log("Menu music play failed (interaction required?):", e);
+                    // Set a timeout to fallback to synth if nothing plays within 4s
+                    // (Giving extra time for the local -> drive fallback sequence)
+                    this.fallbackTimeout = setTimeout(() => {
+                        if (!this.isPlaying && gameState === 'menu') {
+                            console.log("Music system timed out. Falling back to synth.");
+                            this.startSynthFallback();
+                        }
+                    }, 4000);
+
+                    this.menuMusic.play().then(() => {
+                        clearTimeout(this.fallbackTimeout);
+                        const status = document.getElementById('audio-status');
+                        if (status) status.style.display = 'none';
+                        const synthToggle = document.getElementById('synth-toggle');
+                        if (synthToggle) synthToggle.style.display = 'none';
+                    }).catch(e => {
+                        console.log("Initial music play attempt failed. Waiting for fallback or timeout.");
+                        // The 'error' listener handles the Drive fallback automatically
                     });
                 } else {
                     if(this.isPlaying) return;
                     this.isPlaying = true;
                     this.nextNoteTime = this.ctx.currentTime + 0.05;
                     this.scheduler();
+                }
+            }
+
+            startSynthFallback() {
+                if (!this.isPlaying) {
+                    this.isPlaying = true;
+                    this.nextNoteTime = this.ctx.currentTime + 0.1;
+                    this.scheduler();
+                    const errorMsg = document.getElementById('audio-error');
+                    if (errorMsg) errorMsg.style.display = 'block';
+                    const status = document.getElementById('audio-status');
+                    if (status) status.style.display = 'none';
+                    const synthToggle = document.getElementById('synth-toggle');
+                    if (synthToggle) {
+                        synthToggle.style.color = 'var(--neon-pink)';
+                        synthToggle.innerText = 'SYNTH MODE ACTIVE';
+                    }
                 }
             }
             
@@ -584,8 +641,8 @@
             if (!musicSystem) {
                 musicSystem = new DynamicMusicSystem();
                 musicSystem.start();
-                const status = document.getElementById('audio-status');
-                if (status) status.style.display = 'none';
+            } else {
+                musicSystem.start();
             }
         }
 
@@ -670,6 +727,25 @@
                 if (musicSystem) {
                     musicSystem.setVolume(parseFloat(e.target.value));
                 }
+            });
+        }
+
+        const audioStatus = document.getElementById('audio-status');
+        if (audioStatus) {
+            audioStatus.addEventListener('click', (e) => {
+                e.stopPropagation();
+                initMusic();
+            });
+        }
+
+        const synthToggle = document.getElementById('synth-toggle');
+        if (synthToggle) {
+            synthToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!musicSystem) {
+                    musicSystem = new DynamicMusicSystem();
+                }
+                musicSystem.startSynthFallback();
             });
         }
 

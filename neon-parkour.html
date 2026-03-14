@@ -356,8 +356,6 @@
             <label for="volume-slider">AUDIO VOLUME</label>
             <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
             <div id="audio-status" style="font-size: 10px; margin-top: 10px; opacity: 0.6; cursor: pointer; text-decoration: underline;">CLICK TO ENABLE AUDIO</div>
-            <div id="synth-toggle" style="font-size: 10px; margin-top: 5px; cursor: pointer; color: var(--neon-cyan); opacity: 0.8;">USE SYNTH MUSIC ONLY</div>
-            <div id="audio-error" style="font-size: 10px; color: var(--neon-pink); display: none; margin-top: 5px;">EXTERNAL MUSIC FAILED. USING SYNTH THEME.</div>
         </div>
     </div>
 
@@ -384,128 +382,52 @@
 
         let gameState = 'menu';
 
-        class DynamicMusicSystem {
+        class MusicPlayer {
             constructor() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                this.isPlaying = false;
-                this.combatIntensity = 0; // 0 to 1
-                this.tempo = 110;
-                this.nextNoteTime = 0;
-                this.current16thNote = 0;
-                this.scheduleAheadTime = 0.1; // s
-                
-                // Master volume
-                this.masterGain = this.ctx.createGain();
-                this.masterGain.gain.value = 0.15; // Keep it low so it's background
-                this.masterGain.connect(this.ctx.destination);
-                
-                // Menu Music - Standalone Audio object
                 this.menuMusic = new Audio();
-                
-                // 1. TRY LOCAL FILE FIRST (Best for GitHub Pages)
-                // Upload your file to GitHub and name it 'menu-music.mp3'
-                this.menuMusic.src = './menu-music.mp3'; 
+                this.localSources = ['./menu-music.mp3', './main-music.mp3'];
+                this.currentSourceIndex = 0;
+                this.menuMusic.src = this.localSources[this.currentSourceIndex]; 
                 this.menuMusic.loop = true;
-                
-                this.menuMusicGain = null; 
-                this.menuMusicSource = null;
                 this.hasAttemptedDriveFallback = false;
 
                 this.menuMusic.addEventListener('error', (e) => {
-                    // If local file fails and we haven't tried Drive yet, try Drive
-                    if (!this.hasAttemptedDriveFallback) {
-                        console.log("Local music (./menu-music.mp3) not found. Trying Google Drive fallback...");
+                    if (this.currentSourceIndex < this.localSources.length - 1) {
+                        this.currentSourceIndex++;
+                        console.log(`Trying next local source: ${this.localSources[this.currentSourceIndex]}`);
+                        this.menuMusic.src = this.localSources[this.currentSourceIndex];
+                        if (gameState === 'menu') this.menuMusic.play().catch(() => {});
+                    } else if (!this.hasAttemptedDriveFallback) {
+                        console.log("Local music files not found. Trying Google Drive fallback...");
                         this.hasAttemptedDriveFallback = true;
                         this.menuMusic.src = 'https://drive.google.com/uc?export=download&id=1diTMWX7yVcugLWbOTz4kOL0v56A5Tg33';
-                        
-                        // Only try to play if we are still in the menu
                         if (gameState === 'menu') {
-                            this.menuMusic.play().then(() => {
-                                console.log("Drive fallback successful.");
-                                if (this.fallbackTimeout) clearTimeout(this.fallbackTimeout);
-                                const status = document.getElementById('audio-status');
-                                if (status) status.style.display = 'none';
-                            }).catch(() => {
-                                // If Drive also fails, startSynthFallback will be handled by the timeout or the next error
+                            this.menuMusic.play().catch(() => {
+                                console.error("All music sources failed.");
                             });
                         }
                     } else {
-                        console.error("All external music sources failed. Falling back to synth.");
-                        this.startSynthFallback();
+                        console.error("All external music sources failed.");
                     }
                 });
-
-                // Bassline sequence (C minor)
-                this.bassSequence = [36, 36, 36, 36, 39, 39, 39, 39, 43, 43, 43, 43, 41, 41, 41, 41]; 
-                // Arp sequence
-                this.arpSequence = [48, 55, 60, 55, 51, 55, 60, 55, 55, 62, 67, 62, 53, 60, 65, 60]; 
             }
             
             start() {
-                if(this.ctx.state === 'suspended') {
-                    this.ctx.resume().then(() => {
-                        this.startLogic();
-                    });
-                } else {
-                    this.startLogic();
-                }
-            }
-
-            startLogic() {
                 if (gameState === 'menu') {
-                    // Set a timeout to fallback to synth if nothing plays within 4s
-                    // (Giving extra time for the local -> drive fallback sequence)
-                    this.fallbackTimeout = setTimeout(() => {
-                        if (!this.isPlaying && gameState === 'menu') {
-                            console.log("Music system timed out. Falling back to synth.");
-                            this.startSynthFallback();
-                        }
-                    }, 4000);
-
                     this.menuMusic.play().then(() => {
-                        clearTimeout(this.fallbackTimeout);
                         const status = document.getElementById('audio-status');
                         if (status) status.style.display = 'none';
-                        const synthToggle = document.getElementById('synth-toggle');
-                        if (synthToggle) synthToggle.style.display = 'none';
                     }).catch(e => {
-                        console.log("Initial music play attempt failed. Waiting for fallback or timeout.");
-                        // The 'error' listener handles the Drive fallback automatically
+                        console.log("Initial music play attempt failed. Waiting for fallback.");
                     });
-                } else {
-                    if(this.isPlaying) return;
-                    this.isPlaying = true;
-                    this.nextNoteTime = this.ctx.currentTime + 0.05;
-                    this.scheduler();
-                }
-            }
-
-            startSynthFallback() {
-                if (!this.isPlaying) {
-                    this.isPlaying = true;
-                    this.nextNoteTime = this.ctx.currentTime + 0.1;
-                    this.scheduler();
-                    const errorMsg = document.getElementById('audio-error');
-                    if (errorMsg) errorMsg.style.display = 'block';
-                    const status = document.getElementById('audio-status');
-                    if (status) status.style.display = 'none';
-                    const synthToggle = document.getElementById('synth-toggle');
-                    if (synthToggle) {
-                        synthToggle.style.color = 'var(--neon-pink)';
-                        synthToggle.innerText = 'SYNTH MODE ACTIVE';
-                    }
                 }
             }
             
             stop() {
-                this.isPlaying = false;
                 if (this.menuMusic) this.menuMusic.pause();
             }
 
             setVolume(val) {
-                // Procedural music volume
-                this.masterGain.gain.setTargetAtTime(val * 0.3, this.ctx.currentTime, 0.1);
-                // Menu music volume (direct control)
                 if (this.menuMusic) {
                     this.menuMusic.volume = val;
                 }
@@ -513,125 +435,10 @@
 
             switchToGame() {
                 this.menuMusic.pause();
-                this.start();
             }
             
             setCombatState(isCombat) {
-                const target = isCombat ? 1 : 0;
-                this.combatIntensity += (target - this.combatIntensity) * 0.05; // Smooth transition
-            }
-            
-            scheduler() {
-                // Handle tab inactivity
-                if (this.nextNoteTime < this.ctx.currentTime - 0.5) {
-                    this.nextNoteTime = this.ctx.currentTime + 0.05;
-                }
-                
-                while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
-                    this.scheduleNote(this.current16thNote, this.nextNoteTime);
-                    this.nextNote();
-                }
-                if (this.isPlaying) {
-                    this.timerID = requestAnimationFrame(() => this.scheduler());
-                }
-            }
-            
-            nextNote() {
-                const secondsPerBeat = 60.0 / (this.tempo + this.combatIntensity * 25); // Faster in combat
-                this.nextNoteTime += 0.25 * secondsPerBeat;
-                this.current16thNote++;
-                if (this.current16thNote === 16) {
-                    this.current16thNote = 0;
-                }
-            }
-            
-            playTone(freq, time, duration, type, vol, filterFreq) {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                const filter = this.ctx.createBiquadFilter();
-                
-                osc.type = type;
-                osc.frequency.value = freq;
-                
-                filter.type = 'lowpass';
-                filter.frequency.value = filterFreq;
-                
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.masterGain);
-                
-                gain.gain.setValueAtTime(vol, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
-                
-                osc.start(time);
-                osc.stop(time + duration);
-            }
-            
-            scheduleNote(beatNumber, time) {
-                // Play bass
-                const bassNote = this.bassSequence[beatNumber];
-                const bassFreq = 440 * Math.pow(2, (bassNote - 69) / 12);
-                const bassFilter = 200 + this.combatIntensity * 1200; // Open filter in combat
-                this.playTone(bassFreq, time, 0.2, 'sawtooth', 0.6, bassFilter);
-                
-                // Play kick on quarter notes
-                if (beatNumber % 4 === 0) {
-                    this.playKick(time);
-                }
-                
-                // Play hihat on eighth notes
-                if (beatNumber % 2 === 0) {
-                    this.playHihat(time, 0.1 + this.combatIntensity * 0.15);
-                }
-                
-                // Play arp only in combat (or fade it in)
-                if (this.combatIntensity > 0.1) {
-                    const arpNote = this.arpSequence[beatNumber];
-                    const arpFreq = 440 * Math.pow(2, (arpNote - 69) / 12);
-                    this.playTone(arpFreq, time, 0.1, 'square', this.combatIntensity * 0.25, 1000 + this.combatIntensity * 3000);
-                }
-            }
-            
-            playKick(time) {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.masterGain);
-                
-                osc.frequency.setValueAtTime(150, time);
-                osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.1);
-                
-                gain.gain.setValueAtTime(0.8, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
-                
-                osc.start(time);
-                osc.stop(time + 0.1);
-            }
-            
-            playHihat(time, vol) {
-                const bufferSize = this.ctx.sampleRate * 0.05; // 50ms
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
-                }
-                
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = buffer;
-                
-                const filter = this.ctx.createBiquadFilter();
-                filter.type = 'highpass';
-                filter.frequency.value = 7000;
-                
-                const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(vol, time);
-                gain.gain.exponentialRampToValueAtTime(0.01, time + 0.05);
-                
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.masterGain);
-                
-                noise.start(time);
+                // No-op
             }
         }
 
@@ -639,7 +446,7 @@
 
         function initMusic() {
             if (!musicSystem) {
-                musicSystem = new DynamicMusicSystem();
+                musicSystem = new MusicPlayer();
                 musicSystem.start();
             } else {
                 musicSystem.start();
@@ -735,17 +542,6 @@
             audioStatus.addEventListener('click', (e) => {
                 e.stopPropagation();
                 initMusic();
-            });
-        }
-
-        const synthToggle = document.getElementById('synth-toggle');
-        if (synthToggle) {
-            synthToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!musicSystem) {
-                    musicSystem = new DynamicMusicSystem();
-                }
-                musicSystem.startSynthFallback();
             });
         }
 

@@ -407,7 +407,7 @@ function handleFirestoreError(error, operationType, path) {
             if (errorEl) {
                 let msg = "Authentication failed.";
                 if (err.code === 'auth/email-already-in-use') msg = "Username taken.";
-                if (err.code === 'auth/invalid-credential') msg = "Invalid credentials.";
+                if (err.code === 'auth/invalid-credential') msg = "Invalid username or password.";
                 if (err.code === 'auth/weak-password') msg = "Password too weak.";
                 errorEl.innerText = msg;
                 errorEl.classList.remove('hidden');

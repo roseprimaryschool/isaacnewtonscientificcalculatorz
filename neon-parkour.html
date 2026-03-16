@@ -1411,7 +1411,7 @@
                     // Attack: Throw laser sword if they have it
                     if (en.hasSword) {
                         en.attackTimer = (en.attackTimer || 0) + 1;
-                        if (en.attackTimer >= 60) { // Throw after 1 second of holding it
+                        if (en.attackTimer >= 100) { // Nerfed: Increased from 60 to 100 (1.66s)
                             en.hasSword = false;
                             en.attackTimer = 0;
                             enemyProjectiles.push({
@@ -1569,7 +1569,7 @@
                 if (player.x + player.w > p.x && player.x < p.x + p.w &&
                     player.y + player.h > p.y && player.y < p.y + p.h) {
                     if (!player.isDashing) {
-                        takeDamage(25, p.x);
+                        takeDamage(15, p.x); // Nerfed: Reduced from 25 to 15
                         if (p.type === 'sword' && p.timer <= 90) {
                             p.timer = 91; // Force return
                         } else if (p.type !== 'sword') {

@@ -385,7 +385,7 @@
         class MusicPlayer {
             constructor() {
                 this.menuMusic = new Audio();
-                this.localSources = ['./menu-music.mp3', './main-music.mp3'];
+                this.localSources = ['./neon-parkour-audio/neon-menu.mp3', './menu-music.mp3', './main-music.mp3'];
                 this.currentSourceIndex = 0;
                 this.menuMusic.src = this.localSources[this.currentSourceIndex]; 
                 this.menuMusic.loop = true;
@@ -407,12 +407,12 @@
                         if (gameState === 'menu') {
                             this.menuMusic.play().catch(() => {
                                 console.error("All music sources failed.");
-                                if (status) status.innerText = "MUSIC FAILED. PLEASE UPLOAD menu-music.mp3";
+                                if (status) status.innerText = "MUSIC FAILED. PLEASE UPLOAD neon-parkour-audio/neon-menu.mp3";
                             });
                         }
                     } else {
                         console.error("All external music sources failed.");
-                        if (status) status.innerText = "MUSIC FAILED. PLEASE UPLOAD menu-music.mp3";
+                        if (status) status.innerText = "MUSIC FAILED. PLEASE UPLOAD neon-parkour-audio/neon-menu.mp3";
                     }
                 });
             }
